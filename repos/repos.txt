@@ -15,7 +15,7 @@
 # Local folders are machine-specific: if you share this list, others must change them to their own paths
 # (or use the git URL instead).
 #
-# Then check / clone everything with:   python3 -I workflow/scripts/repos.py clone     (or /dep-clone in chat)
+# Then check / clone everything with:   python3 -I toolkit/scripts/repos.py clone     (or /dep-clone in chat)
 
 learning-java  ~/repos/learning-java  branch=main  path=backend  smoke=true
 # orders-service  https://github.com/my-org/orders-service.git  branch=develop

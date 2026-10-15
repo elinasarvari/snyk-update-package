@@ -4,8 +4,8 @@
 
 | You write | What happens | Where the changes go |
 |-----------|--------------|----------------------|
-| **a local folder** you already have, e.g. `~/repos/learning-java` | Used **in place**. Nothing is cloned or copied | Your own checkout, on a new branch `deps/<upgrade-id>` |
-| **a git URL**, e.g. `https://github.com/my-org/orders.git` | Cloned into `repos/<name>/` here (git-ignored) | That clone, on branch `deps/<upgrade-id>` |
+| **a local folder** you already have, e.g. `~/repos/learning-java` | Used **in place**. Nothing is cloned or copied | Your own checkout, on a new branch `deps/<workflow-id>` |
+| **a git URL**, e.g. `https://github.com/my-org/orders.git` | Cloned into `repos/<name>/` here (git-ignored) | That clone, on branch `deps/<workflow-id>` |
 
 **In both cases the repo's code and changes stay in that repo.** This project (`snyk-update-package`)
 never stores them, and nothing here is a git submodule. Only `repos.txt` and this README are committed.
@@ -51,8 +51,8 @@ billing         git@bitbucket.org:my-team/billing.git
 Or add it with a command, or by asking in chat:
 
 ```bash
-python3 -I workflow/scripts/repos.py add ~/repos/orders-service path=api                  # local folder
-python3 -I workflow/scripts/repos.py add https://github.com/my-org/orders-service.git     # git URL
+python3 -I toolkit/scripts/repos.py add ~/repos/orders-service path=api                  # local folder
+python3 -I toolkit/scripts/repos.py add https://github.com/my-org/orders-service.git     # git URL
 ```
 
 In Copilot or Claude chat: `/dep-clone ~/repos/orders-service` or `/dep-clone <git-url>`.
@@ -70,8 +70,8 @@ they change the paths to their own, or use the git URL instead.
 From the project root (the `snyk-update-package` folder):
 
 ```bash
-python3 -I workflow/scripts/repos.py clone                   # every repo in the list
-python3 -I workflow/scripts/repos.py clone orders-service    # just one
+python3 -I toolkit/scripts/repos.py clone                   # every repo in the list
+python3 -I toolkit/scripts/repos.py clone orders-service    # just one
 ```
 
 Or in chat: `/dep-clone`
@@ -94,7 +94,7 @@ What it prints, per repo:
 ## Step 3: Check the status
 
 ```bash
-python3 -I workflow/scripts/repos.py status
+python3 -I toolkit/scripts/repos.py status
 ```
 
 ```text
@@ -112,8 +112,8 @@ orders-service       clone  9c1e2aa  develop       0      0      0       ~/repos
 | I want to… | Do this |
 |------------|---------|
 | Get the latest code | URL repos: `repos.py clone`. Local folders: `git pull` in the folder yourself |
-| Work on only some repos in one upgrade | Create `upgrades/<id>/repos.txt` with just those lines (same format) |
-| See what an upgrade changed | `git -C <folder> diff`. The changes are on branch `deps/<upgrade-id>` |
+| Work on only some repos in one upgrade | Create `workflows/<id>/repos.txt` with just those lines (same format) |
+| See what an upgrade changed | `git -C <folder> diff`. The changes are on branch `deps/<workflow-id>` |
 | Go back to my own branch after an upgrade (local folder) | `git -C <folder> switch main`. The `deps/<id>` branch stays until you delete it |
 | Stop working on a repo | Delete its line. For URL repos, also `rm -rf repos/<name>` once you no longer need the clone |
 

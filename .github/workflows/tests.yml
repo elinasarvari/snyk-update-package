@@ -1,0 +1,30 @@
+name: tests
+
+# Proves the /dep-* commands' scripts and wiring work. Runs in throwaway sandboxes:
+# no real repos are touched and no upgrades are applied.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Run test suite
+        env:
+          RUN_MAVEN_TESTS: "1"
+        run: tests/run.sh -v

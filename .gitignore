@@ -6,6 +6,6 @@ repos/*
 
 # Raw build/boot logs are large and machine-specific; summaries and diagnoses are kept.
 *.log
-upgrades/_health/
+workflows/_health/
 .DS_Store
 __pycache__/

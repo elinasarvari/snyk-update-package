@@ -5,7 +5,7 @@ description: Snyk-driven dependency upgrade workflow for the Java/Maven repos cl
 
 # Dependency upgrade workflow
 
-Read `workflow/WORKFLOW.md` at the project root. It is the single source of truth (phases, gates,
-layout, principles, scripts). Run each phase by following its file in `workflow/phases/`. The user-facing
+Read `toolkit/WORKFLOW.md` at the project root. It is the single source of truth (phases, gates,
+layout, principles, scripts). Run each phase by following its file in `toolkit/phases/`. The user-facing
 commands are `/dep-upgrade`, `/dep-clone`, `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-apply`,
 `/dep-verify` and `/dep-publish`.
