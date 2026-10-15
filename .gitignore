@@ -10,3 +10,8 @@ workflows/_health/
 .DS_Store
 __pycache__/
 test-results.txt
+
+# Workflow records are personal: they stay on your machine, never in git (only workflows/README.md is tracked).
+workflows/wf-*/
+workflows/INDEX.md
+workflows/.last-id

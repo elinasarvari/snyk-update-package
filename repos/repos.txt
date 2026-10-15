@@ -15,5 +15,6 @@
 #
 # Then:  python3 -I toolkit/scripts/repos.py clone        (or /dep-clone, or just /dep-run <name>)
 
-learning-java  https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true
-# orders-service  git@github.com:my-org/orders-service.git  branch=develop
+# Examples - remove the leading "# " and change them to your own repos:
+# inventory-service  https://github.com/acme-corp/inventory-service.git  path=backend  smoke=true
+# orders-service     git@github.com:acme-corp/orders-service.git          branch=develop

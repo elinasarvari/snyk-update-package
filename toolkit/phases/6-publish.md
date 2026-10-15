@@ -28,4 +28,4 @@
 5. **Record** in `06-publish.md` and in the STATUS "Repos" PR column: commit SHA, PR URL, state.
 6. `python3 -I toolkit/scripts/workflows.py phase <id> 6 done`, with each PR URL logged via `log`. ▶ Next step: "review/merge the PRs. Afterwards: `python3 -I toolkit/scripts/repos.py --workflow <id> release`
    puts the clones back on main (the branch is kept)".
-   Offer to commit this upgrade's docs in the meta repo too; only do it if the user says yes.
+   The workflow's own records stay local (git-ignored). The PR description is how the findings are shared.

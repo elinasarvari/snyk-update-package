@@ -122,4 +122,5 @@ Each of these appends a timestamped line to the run's **History** and rebuilds `
 - **One branch per workflow, one workflow at a time per clone.** Workflow `wf-NNN` works on `deps/wf-NNN`, created
   from the latest main by `repos.py --workflow <id> clone`. Never create or name the branch any other way.
 - **Nothing leaves the machine without the user asking.** Commits, pushes and PRs in target repos
-  happen only in `/dep-publish`. This meta repo's own docs are committed only when the user asks.
+  happen only in `/dep-publish`. Workflow records (`workflows/wf-*`, `INDEX.md`) are git-ignored and stay on the
+  user's machine; never commit them or `repos/repos.txt` entries for the user.

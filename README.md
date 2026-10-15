@@ -181,11 +181,11 @@ workflows/wf-001-spring-boot-4-1/
 
 | Path | What it is | Edit it? |
 |------|------------|----------|
-| `repos/repos.txt` | The list of repos to fix (git URLs) | **yes**, this is your list |
+| `repos/repos.txt` | The list of repos to fix (git URLs). Ships with commented-out examples only | **yes**, this is your list (see the note below) |
 | `repos/README.md` | How to add repos (local vs URL), check, clone, refresh and remove them | — |
 | `repos/<name>/` | Clones of repos listed by URL (git-ignored, never committed here) | no, managed by `/dep-clone` |
-| `workflows/wf-NNN-<slug>/` | One folder per workflow run (Workflow 1 = `wf-001`, …) | generated, review it |
-| `workflows/INDEX.md` | All runs with their current step and next step | no, rebuilt automatically |
+| `workflows/wf-NNN-<slug>/` | One folder per workflow run (Workflow 1 = `wf-001`, …). **Stays on your machine, git-ignored** | generated, review it |
+| `workflows/INDEX.md` | All runs with their current step and next step. Created on your machine with your first run (git-ignored) | no, rebuilt automatically |
 | `workflows/README.md` | How workflow ids and folders work | — |
 | `toolkit/WORKFLOW.md` | Overview the assistants read first: phases, gates, rules | to change behaviour |
 | `toolkit/RUN.md` | What `/dep-run` does: step order, when it continues, when it stops, its final reply | to change behaviour |
@@ -206,6 +206,11 @@ workflows/wf-001-spring-boot-4-1/
 | `tools/generate-entrypoints.py` | Regenerates the Copilot and Claude files from one spec | when adding a command |
 | `tests/` | Automated tests for every script and command (`tests/run.sh`, `tests\\run.ps1`), run locally | when changing behaviour |
 | `.gitattributes` | Keeps LF line endings on Windows checkouts, so the bash scripts keep working | no |
+
+**What stays private:** your workflow records (`workflows/wf-*`, `INDEX.md`) and the clones (`repos/<name>/`)
+are git-ignored, so they never leave your machine with a push. `repos/repos.txt` is tracked so the project ships an
+example. Once you add your own repos to it, don't commit it (`git status` shows it as modified), or keep it
+uncommitted with `git update-index --skip-worktree repos/repos.txt`.
 
 To change how a step works, edit its file in `toolkit/phases/`. Both assistants pick it up immediately.
 To add or rename a command, or change a handoff button, edit `tools/generate-entrypoints.py`, then run

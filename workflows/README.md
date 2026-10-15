@@ -1,6 +1,8 @@
 # workflows/: one folder per workflow run
 
-Every time you start the `/dep-*` workflow, the run gets the next **unique id** and its own folder:
+Every time you start the `/dep-*` workflow, the run gets the next **unique id** and its own folder.
+**The records stay on your machine:** `workflows/wf-*`, `INDEX.md` and `.last-id` are git-ignored, so a
+push never publishes them. Only this README is in git.
 
 | Run | Id | Folder | Branch it creates in each repo |
 |-----|----|--------|--------------------------------|
@@ -10,7 +12,7 @@ Every time you start the `/dep-*` workflow, the run gets the next **unique id** 
 - **Ids are never reused.** Even if you delete a folder, the next run gets a new number
   (`workflows/.last-id` remembers the highest one).
 - **Refer to a run however you like:** `1`, `wf-1`, `wf-001`, or the folder name, e.g. `/dep-inventory 1`.
-- **[INDEX.md](INDEX.md) lists every run** with its current step and ▶ next step. It's rebuilt
+- **`INDEX.md` lists every run** with its current step and ▶ next step. It's created with your first run and rebuilt
   automatically; don't edit it.
 
 ## Inside each run's folder
