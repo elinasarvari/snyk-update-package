@@ -250,6 +250,71 @@ your real repos or GitHub, and never apply an upgrade.
 one of them, the other version's test goes red. On Windows the bash runs are skipped. On a Mac, the PowerShell runs
 need `pwsh` (`brew install powershell`); without it they're skipped.
 
+### Running the tests on Windows, step by step
+
+**1. Check the tools.** Open **Windows PowerShell** (Start menu → "Windows PowerShell", or Windows Terminal) and run:
+
+```powershell
+git --version        # any recent Git for Windows
+py -3 --version      # Python 3.9 or newer
+java -version        # Java 17+ (the version your repos use)
+javac -version       # optional: a full JDK runs 3 extra app-boot tests
+```
+
+If one says *"is not recognized"*, install it (see [Quick start](#quick-start), step 1), then **open a new PowerShell
+window** so it picks up the new PATH.
+
+**2. Get the latest project.**
+
+```powershell
+git clone https://github.com/elinasarvari/snyk-update-package.git    # first time
+cd snyk-update-package
+git pull                                                              # every time after that
+```
+
+**3. Run the tests** from the `snyk-update-package` folder. It takes 1–3 minutes:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\run.ps1
+```
+
+`-ExecutionPolicy Bypass` lets this one run use the scripts without changing any Windows setting.
+
+**4. Read the result**, on the last lines:
+
+| You see | Meaning |
+|---------|---------|
+| `Ran 110 tests in …s` then `OK (skipped=23)` | **Everything works.** The 23 skipped are the 22 bash-version tests (bash isn't used on Windows) and the real-Maven test (step 5) |
+| `OK (skipped=26)` | Also fine: `javac` wasn't found, so the 3 app-boot tests were skipped. Install a JDK to run them |
+| `FAILED (failures=…, errors=…)` | Something doesn't work on this machine. Each problem is listed above as a line starting with **`FAIL:`** or **`ERROR:`**, followed by the details |
+
+**5. Optional extra runs:**
+
+```powershell
+$env:RUN_MAVEN_TESTS = "1"; powershell -ExecutionPolicy Bypass -File tests\run.ps1   # + a real Maven build (needs mvn and internet the first time)
+$env:SUP_PS = "pwsh";       powershell -ExecutionPolicy Bypass -File tests\run.ps1   # test the .ps1 scripts with PowerShell 7 instead of 5.1
+Remove-Item Env:RUN_MAVEN_TESTS, Env:SUP_PS -ErrorAction SilentlyContinue           # back to normal
+```
+
+**6. Something failed? Save the output to share it:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\run.ps1 2>&1 | Tee-Object -FilePath test-results.txt
+```
+
+You still see the output on screen, and `test-results.txt` holds a copy (it isn't committed). Send the
+`FAIL:` / `ERROR:` blocks, or the whole file.
+
+| Problem | Fix |
+|---------|-----|
+| `py : The term 'py' is not recognized` | Reinstall Python from python.org with **"py launcher"** and **"Add python.exe to PATH"** ticked, then open a new window |
+| `… cannot be loaded because running scripts is disabled on this system` | You ran `.\tests\run.ps1` directly. Use the `powershell -ExecutionPolicy Bypass -File …` form above |
+| `git : The term 'git' is not recognized` | Install Git for Windows, then open a new window |
+| Many `ERROR:` lines mentioning `bash` | Should not happen on Windows (bash tests are skipped). Send the output |
+| Very slow, or files "in use" | Antivirus scanning the temporary test folders. Run it again, or ask IT to exclude `%TEMP%\sup-test-*` |
+
+### What the tests check
+
 | Test file | Proves |
 |-----------|--------|
 | `test_repos.py` | Repos are cloned into `repos/` and refreshed only when clean. **Each workflow gets `deps/wf-NNN` from the latest main**, workflows don't overwrite each other's unpublished work, `release` returns to main. **Your own checkout is never touched** (branch, commit, files). No submodules; clones are never committed |
