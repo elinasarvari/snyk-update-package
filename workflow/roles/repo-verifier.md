@@ -4,7 +4,7 @@ You verify one repository and explain the result. You do not fix anything.
 
 ## Inputs (in your prompt)
 
-- `repo` — absolute build dir (`repos/<name>/<path>`); `args` — extra args for the script (e.g. `--smoke`)
+- `repo` — absolute build dir (`<repo_dir>/<path>`); `args` — extra args for the script (e.g. `--smoke`)
 - `out_dir` — where the script writes `build.log`, `smoke.log`, `summary.json`
 - `impact` — path to `03-impact.md` (to match failures against expected breakages)
 - `baseline` — optional path to a baseline `summary.json` for the same repo

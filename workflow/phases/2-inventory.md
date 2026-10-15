@@ -26,7 +26,7 @@ version is set in the pom, and what else moves with it. Then take a **baseline**
    - the version that actually resolves now;
    - the **lever** that sets it: parent, BOM, property, explicit, or the direct dependency that pulls a
      transitive in.
-   Any mismatch with the report (e.g. Snyk says 3.5.16, the clone resolves 3.3.2) goes under
+   Any mismatch with the report (e.g. Snyk says 3.5.16, the repo resolves 3.3.2) goes under
    **Discrepancies**, with the likely reason (other branch, stale scan).
 6. **What moves with it:** if the lever is a platform parent/BOM, fetch the target's managed versions
    (e.g. `spring-boot-dependencies-<target>.pom` on Maven Central). List every dependency in the

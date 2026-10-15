@@ -1,14 +1,21 @@
-# The repositories to clone, scan, upgrade and verify. One per line. How-to: repos/README.md
+# The repositories to scan, upgrade and verify. One per line. How-to: repos/README.md
 #
-#   <name>  <git-url>  [branch=<b>] [path=<subdir>] [smoke=true] [build="<cmd>"]
+#   <name>  <where>  [branch=<b>] [path=<subdir>] [smoke=true] [build="<cmd>"]
 #
-#   name    folder it is cloned into: repos/<name>/   (letters, digits, . _ - only)
-#   git-url the same URL you would give `git clone` (HTTPS or SSH)
-#   branch  branch to clone and keep up to date      (default: the repo's default branch)
+#   name    short name used in commands (letters, digits, . _ - only)
+#   where   EITHER a local folder you already have   →  used in place, never cloned or pulled
+#               ~/repos/learning-java     /abs/path/repo     ../my-repo      (must start with / ~ ./ ../)
+#           OR a git URL                             →  cloned into repos/<name>/ (git-ignored)
+#               https://github.com/org/repo.git      git@github.com:org/repo.git
+#   branch  URL: branch to clone and keep updated.  Local folder: the branch you expect it on (only checked)
 #   path    sub-folder that holds pom.xml / build.gradle  (default: the repo root)
 #   smoke   also start the app during verification and wait for "Started ... in"
-#   build   your own build command                   (default: ./mvnw -B clean verify  or  ./gradlew clean build)
+#   build   your own build command  (default: ./mvnw -B clean verify  or  ./gradlew clean build)
 #
-# Then clone everything with:   python3 -I workflow/scripts/repos.py clone     (or /dep-clone in chat)
+# Local folders are machine-specific: if you share this list, others must change them to their own paths
+# (or use the git URL instead).
+#
+# Then check / clone everything with:   python3 -I workflow/scripts/repos.py clone     (or /dep-clone in chat)
 
-learning-java  https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true
+learning-java  ~/repos/learning-java  branch=main  path=backend  smoke=true
+# orders-service  https://github.com/my-org/orders-service.git  branch=develop

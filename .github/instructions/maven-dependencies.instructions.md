@@ -1,6 +1,6 @@
 ---
 applyTo: "repos/**/pom.xml"
-description: "Rules for changing dependency versions in the cloned repos' Maven poms"
+description: "Rules for changing dependency versions in the target repos' Maven poms"
 ---
 
 # Changing dependency versions

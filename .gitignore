@@ -1,5 +1,5 @@
-# Clones of the target repos live in repos/<name>/ and are never committed here.
-# Only the list and its README are tracked.
+# Repos added by git URL are cloned into repos/<name>/ and never committed here.
+# (Repos added as a local folder stay where they are.) Only the list and its README are tracked.
 repos/*
 !repos/repos.txt
 !repos/README.md
@@ -8,3 +8,4 @@ repos/*
 *.log
 upgrades/_health/
 .DS_Store
+__pycache__/

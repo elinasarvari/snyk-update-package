@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run a Snyk open-source scan on every cloned repo in the manifest; keep the raw JSON per repo.
+# Run a Snyk open-source scan on every repo folder in the list (local or cloned); keep the raw JSON per repo.
 # Read-only for the repos (Snyk resolves the Maven/Gradle tree; it does not edit files).
 #
 # Usage (from the project root):
@@ -44,8 +44,8 @@ repos=$(python3 -I "$here/repos.py" "${manifest_args[@]}" list) || exit 2
 while IFS=$'\t' read -r name dir _rest; do
   [[ -z "$name" ]] && continue
   if [[ ! -d "$dir" ]]; then
-    printf '%s\t%s\t-\tnot cloned - run repos.py clone %s\n' "$name" "$dir" "$name" >> "$out/scan-index.tsv"
-    echo "SKIP $name: $dir does not exist (not cloned?)" >&2
+    printf '%s\t%s\t-\tfolder missing - run repos.py clone %s\n' "$name" "$dir" "$name" >> "$out/scan-index.tsv"
+    echo "SKIP $name: $dir does not exist (not cloned, or wrong local path?)" >&2
     continue
   fi
   echo "SCAN $name ($dir)" >&2

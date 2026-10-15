@@ -5,7 +5,7 @@ upgraded in isolation. Read-only.
 
 ## Input
 
-- nothing → run the Snyk CLI over every clone (step 3);
+- nothing → run the Snyk CLI over every repo folder in the list (step 3);
 - one or more Snyk JSON files (`snyk test --all-projects --json`, e.g. from CI) → skip to step 4;
 - pasted Snyk output (CLI text, IDE plugin, web-UI issue list) → step 4, by hand.
 
@@ -13,7 +13,7 @@ upgraded in isolation. Read-only.
 
 1. **Upgrade folder:** use the given id, or create `upgrades/<YYYY-MM-DD>-<slug>/` (slug from the main
    package, or `snyk-sweep`) and copy `workflow/templates/STATUS.md` into it. STATUS phase 1 → 🟡.
-2. **Clones:** if any repo in the manifest isn't cloned, run phase 0 first.
+2. **Repo folders:** if any repo in the list has no folder yet (URL not cloned, or wrong local path), run phase 0 first.
 3. **Scan** (only when no report was supplied):
    `bash workflow/scripts/snyk-scan.sh upgrades/<id>/snyk [--manifest upgrades/<id>/repos.txt] [--org=<org>]`
    - Exit 127/126 means the CLI is missing or not logged in. Stop and give the user the commands

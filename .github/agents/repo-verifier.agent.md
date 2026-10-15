@@ -1,6 +1,6 @@
 ---
 name: "repo-verifier"
-description: "Builds, tests and smoke-boots ONE cloned repo with verify-repo.sh and classifies failures (regression / pre-existing / environmental) against the baseline and 03-impact.md. Reports only. Invoked as a subagent."
+description: "Builds, tests and smoke-boots ONE repo with verify-repo.sh and classifies failures (regression / pre-existing / environmental) against the baseline and 03-impact.md. Reports only. Invoked as a subagent."
 tools: ["read", "search", "execute/runInTerminal", "execute/getTerminalOutput", "edit/editFiles"]
 user-invocable: false
 ---

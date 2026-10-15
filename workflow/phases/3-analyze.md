@@ -27,7 +27,7 @@ Requires phase 2 ✅. Read-only. Writes `03-impact.md` and `03-plan.md`.
    - **Order** the steps per repo so each compiles: pom/BOM bumps → coupled deps → renamed starters/artifacts
      → code package moves → config keys → test changes.
    - Give exact diffs for pom/config edits, and precise descriptions with `path:line` for code edits.
-     Paths are relative to the clone.
+     Paths are relative to the repo folder.
    - Each step's "Verify after" is `compile`, `test` or `smoke`.
 6. STATUS phase 3 → ⏸ awaiting approval. ▶ Next step: "review `03-plan.md`; reply *approve* (or ask
    for changes), then `/dep-apply <id>`".

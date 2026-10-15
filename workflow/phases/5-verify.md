@@ -5,10 +5,10 @@ Build, test and boot every target repo. Also usable on its own as a health check
 ## Steps
 
 1. **Repos:** take them from `repos.py list`, using the upgrade manifest if there is one. If the user named
-   repos, check only those. A repo that isn't cloned is reported as `missing`.
+   repos, check only those. A repo whose folder doesn't exist (not cloned, or wrong local path) is reported as `missing`.
 2. **Health-check mode** (argument `baseline`): run `verify-repo.sh` for each repo on its current branch
    into `upgrades/_health/<date>/<name>/`, then report. No upgrade folder is needed.
-3. **Upgrade mode:** check each clone is on `deps/<id>`. If one isn't, ask; don't switch branches for the
+3. **Upgrade mode:** check each repo folder is on `deps/<id>`. If one isn't, ask; don't switch branches for the
    user. Copy `workflow/templates/05-verification.md`. STATUS phase 5 → 🟡.
 4. **Delegate each repo to the `repo-verifier` subagent** (role: `workflow/roles/repo-verifier.md`),
    in parallel when possible. Pass:
@@ -27,7 +27,7 @@ Build, test and boot every target repo. Also usable on its own as a health check
    pre-existing / environmental / unknown), and the Verdict.
 7. STATUS phase 5 → ✅ if every repo is green, or only pre-existing/environmental failures remain
    (say which). Otherwise ⛔.
-   - ▶ Next step when green: "review the diff (`git -C repos/<name> diff`), then `/dep-publish <id>`".
+   - ▶ Next step when green: "review the diff (`git -C <repo_dir> diff`), then `/dep-publish <id>`".
    - ▶ Next step when red: the fix for each regression. Add it as new plan steps (needs
      re-approval), then `/dep-apply` → `/dep-verify` again.
 8. Never re-run with tests skipped to manufacture a green result.

@@ -1,6 +1,6 @@
 ---
 name: "dependency-analyst"
-description: "Read-only impact analysis of ONE dependency upgrade in ONE cloned repo: how the version is set, what moves with it, affected code/config/tests with path:line, coupled library requirements, cited from official migration docs. Invoked as a subagent."
+description: "Read-only impact analysis of ONE dependency upgrade in ONE repo: how the version is set, what moves with it, affected code/config/tests with path:line, coupled library requirements, cited from official migration docs. Invoked as a subagent."
 tools: ["read", "search", "search/usages", "web/fetch", "execute/runInTerminal", "execute/getTerminalOutput", "edit/editFiles"]
 user-invocable: false
 ---

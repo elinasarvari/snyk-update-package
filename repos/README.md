@@ -1,18 +1,29 @@
 # repos/: the repositories this project works on
 
-This folder holds **the list of repos to fix** and **the clones of those repos**.
+`repos/repos.txt` is **the list of repos to fix**. Each line points at the repo in one of two ways:
+
+| You write | What happens | Where the changes go |
+|-----------|--------------|----------------------|
+| **a local folder** you already have, e.g. `~/repos/learning-java` | Used **in place**. Nothing is cloned or copied | Your own checkout, on a new branch `deps/<upgrade-id>` |
+| **a git URL**, e.g. `https://github.com/my-org/orders.git` | Cloned into `repos/<name>/` here (git-ignored) | That clone, on branch `deps/<upgrade-id>` |
+
+**In both cases the repo's code and changes stay in that repo.** This project (`snyk-update-package`)
+never stores them, and nothing here is a git submodule. Only `repos.txt` and this README are committed.
+The changes reach the repo's own GitHub as a pull request (`/dep-publish`).
 
 ```text
-repos/
-├── README.md          ← this guide                      (committed)
-├── repos.txt          ← THE LIST: which repos to clone  (committed - you edit this)
-├── learning-java/     ← a clone of a repo from the list (NOT committed - git-ignored)
-└── orders-service/    ← another clone                    (NOT committed)
+snyk-update-package/repos/
+├── README.md          ← this guide                                   (committed)
+├── repos.txt          ← THE LIST                                     (committed - you edit this)
+└── orders-service/    ← only for repos added by URL: a plain clone   (NOT committed)
+
+~/repos/learning-java/ ← a repo added as a local folder: stays exactly where it is
 ```
 
-- **`repos.txt` is the only file you edit.** Every command reads it.
-- **Each clone is a normal git repo** in `repos/<name>/`. You can `cd` into it, open it in VS Code,
-  and use git as usual. This project never commits the clones; only the list and this README are tracked.
+**Which one should I use?**
+- **The repo is already on your machine:** use the **local folder**. You'll see the upgrade in your normal
+  checkout, and there's no second copy to keep in sync.
+- **You don't have it checked out, or you want the upgrade fully separate from your own work:** use the **git URL**.
 
 ---
 
@@ -21,40 +32,45 @@ repos/
 Open [`repos.txt`](repos.txt) and add one line per repo:
 
 ```text
-<name>          <git-url>                                          [options]
-learning-java   https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true
-orders-service  git@github.com:my-org/orders-service.git           branch=develop
-billing         https://bitbucket.org/my-team/billing.git
+<name>          <local folder or git URL>                     [options]
+learning-java   ~/repos/learning-java                         branch=main  path=backend  smoke=true
+orders-service  https://github.com/my-org/orders-service.git  branch=develop
+billing         git@bitbucket.org:my-team/billing.git
 ```
 
 | Part | Required | Meaning | Example |
 |------|----------|---------|---------|
-| `name` | yes | Folder name: the clone goes to `repos/<name>/`. You also use it in commands | `orders-service` |
-| `git-url` | yes | The URL you'd give `git clone`: the green **Code** button on GitHub | `https://github.com/my-org/orders-service.git` |
-| `branch=` | no | Branch to clone and keep updated. Default: the repo's default branch | `branch=develop` |
-| `path=` | no | Sub-folder with `pom.xml` / `build.gradle`, if not at the root | `path=backend` |
+| `name` | yes | Short name you use in commands. For URLs, also the clone folder `repos/<name>/` | `orders-service` |
+| local folder | one of these | Path to your checkout. Must start with `/`, `~`, `./` or `../` | `~/repos/learning-java` |
+| git URL | one of these | The URL you'd give `git clone`: the green **Code** button on GitHub | `https://github.com/my-org/orders-service.git` |
+| `branch=` | no | URL: the branch to clone and keep updated. Local folder: the branch you expect it on; you're warned if it isn't, but it's never switched for you | `branch=main` |
+| `path=` | no | Sub-folder with `pom.xml` / `build.gradle`, if not at the repo root | `path=backend` |
 | `smoke=true` | no | Also start the app during verification, to catch startup-only failures | `smoke=true` |
 | `build=` | no | Your own build command, if the default doesn't fit | `build="./mvnw -B -Pci verify"` |
 
-You can also add a repo without editing the file:
+Or add it with a command, or by asking in chat:
 
 ```bash
-python3 -I workflow/scripts/repos.py add https://github.com/my-org/orders-service.git orders-service path=api
+python3 -I workflow/scripts/repos.py add ~/repos/orders-service path=api                  # local folder
+python3 -I workflow/scripts/repos.py add https://github.com/my-org/orders-service.git     # git URL
 ```
 
-Or in Copilot / Claude chat: `/dep-clone https://github.com/my-org/orders-service.git`
+In Copilot or Claude chat: `/dep-clone ~/repos/orders-service` or `/dep-clone <git-url>`.
 
-**Which URL, HTTPS or SSH?** Use whatever already works for you with plain `git clone`:
+**Sharing this list:** local folders are specific to your machine. If someone else uses your `repos.txt`,
+they change the paths to their own, or use the git URL instead.
+
+**For git URLs, HTTPS or SSH?** Use whatever already works for you with plain `git clone`:
 - **HTTPS** (`https://github.com/...`) uses your saved GitHub login (macOS Keychain) or a token.
 - **SSH** (`git@github.com:...`) uses your SSH key. Test it with `ssh -T git@github.com`.
-- **Private repos** clone only if *your* account has access. This project uses your normal git credentials.
+- **Private repos** need *your* account to have access.
 
-## Step 2: Clone
+## Step 2: Check (and clone the URL ones)
 
 From the project root (the `snyk-update-package` folder):
 
 ```bash
-python3 -I workflow/scripts/repos.py clone                   # clone/refresh every repo in the list
+python3 -I workflow/scripts/repos.py clone                   # every repo in the list
 python3 -I workflow/scripts/repos.py clone orders-service    # just one
 ```
 
@@ -62,31 +78,32 @@ Or in chat: `/dep-clone`
 
 What it prints, per repo:
 
-| Message | Meaning |
-|---------|---------|
-| `cloned` | It wasn't there; now it is, in `repos/<name>/` |
-| `up to date` | Already cloned; fetched and fast-forwarded to the latest commit |
-| `kept as is - N uncommitted file(s)` | You have local changes there; it won't touch them |
-| `kept as is - on branch deps/…` | An upgrade is in progress on that clone; it won't switch branches |
-| `CLONE FAILED: …` | Wrong URL or no access. Try the same `git clone <url>` by hand to see why |
-| `WARNING: path=… does not exist` | The `path=` option is wrong; fix the line in `repos.txt` |
+| Message | Type | Meaning |
+|---------|------|---------|
+| `local, used in place (main @ 5f3f485)` | local | Found your folder. Nothing was changed |
+| `… \| on X, expected main - switch it yourself if needed` | local | Your checkout is on another branch. It's left alone; switch it if the upgrade should start from `main` |
+| `… \| N uncommitted file(s)` | local | `/dep-apply` will wait until you commit them, so your work is never mixed into the upgrade |
+| `… \| N commit(s) behind origin` | local | Run `git pull` in that folder if you want the latest code first |
+| `LOCAL FOLDER NOT FOUND or not a git repo` | local | Wrong path in `repos.txt` |
+| `cloned` | URL | Cloned into `repos/<name>/` |
+| `up to date` | URL | Already cloned; fetched and fast-forwarded |
+| `kept as is - …` | URL | The clone has local changes or is on `deps/…`; it won't touch it |
+| `CLONE FAILED: …` | URL | Wrong URL or no access. Try `git clone <url>` by hand to see why |
+| `WARNING: path=… does not exist` | both | The `path=` option is wrong |
 
-## Step 3: Check
+## Step 3: Check the status
 
 ```bash
 python3 -I workflow/scripts/repos.py status
 ```
 
 ```text
-REPO                     COMMIT   BRANCH                       DIRTY     AHEAD  BEHIND
-learning-java            5f3f485  main                         0         0      0
-orders-service           not cloned - run: repos.py clone orders-service
+REPO                 TYPE   COMMIT   BRANCH        DIRTY  AHEAD  BEHIND  FOLDER
+learning-java        local  5f3f485  main          0      0      0       ~/repos/learning-java
+orders-service       clone  9c1e2aa  develop       0      0      0       ~/repos/snyk-update-package/repos/orders-service
 ```
 
-- `DIRTY` = files you changed.
-- `AHEAD` / `BEHIND` = commits compared with the remote branch.
-
-`python3 -I workflow/scripts/repos.py list` shows the folder each repo builds in.
+`FOLDER` is where the code is, and where the upgrade will make its changes.
 
 ---
 
@@ -94,17 +111,17 @@ orders-service           not cloned - run: repos.py clone orders-service
 
 | I want to… | Do this |
 |------------|---------|
-| Get the latest code for all repos | `python3 -I workflow/scripts/repos.py clone` (safe to re-run any time) |
+| Get the latest code | URL repos: `repos.py clone`. Local folders: `git pull` in the folder yourself |
 | Work on only some repos in one upgrade | Create `upgrades/<id>/repos.txt` with just those lines (same format) |
-| Stop working on a repo | Delete its line from `repos.txt`, then `rm -rf repos/<name>` once you no longer need the clone |
-| Start a clone from scratch | Make sure nothing in it is needed, `rm -rf repos/<name>`, then `repos.py clone <name>` |
-| See what an upgrade changed in a clone | `git -C repos/<name> diff` (changes sit on branch `deps/<upgrade-id>`) |
+| See what an upgrade changed | `git -C <folder> diff`. The changes are on branch `deps/<upgrade-id>` |
+| Go back to my own branch after an upgrade (local folder) | `git -C <folder> switch main`. The `deps/<id>` branch stays until you delete it |
+| Stop working on a repo | Delete its line. For URL repos, also `rm -rf repos/<name>` once you no longer need the clone |
 
-## What the tools will and won't do to a clone
+## What the tools will and won't do to a repo folder
 
-| Step | Effect on `repos/<name>/` |
-|------|---------------------------|
-| `/dep-clone` | Clones it, or fast-forwards it if it's clean. Never resets, stashes or switches branches |
-| `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-verify` | Read-only (builds create `target/` / `build/`, which the clone's own `.gitignore` should ignore) |
-| `/dep-apply` | Creates branch `deps/<upgrade-id>` and edits files there. Nothing is committed |
-| `/dep-publish` | Commits on `deps/<upgrade-id>`, pushes that branch, opens a PR. Never pushes to `main`, never force-pushes |
+| Step | Local folder (your checkout) | URL clone in `repos/<name>/` |
+|------|------------------------------|------------------------------|
+| `/dep-clone` | Looks only: fetches remote refs, never pulls, switches or edits | Clones, or fast-forwards if clean |
+| `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-verify` | Read-only. Builds create `target/` / `build/` | same |
+| `/dep-apply` | **Switches your checkout to a new branch `deps/<id>`** and edits files there. You're told before it starts. Refuses if you have uncommitted changes | Same, inside the clone |
+| `/dep-publish` | Commits on `deps/<id>`, pushes that branch, opens a PR. Never pushes to `main`, never force-pushes | same |

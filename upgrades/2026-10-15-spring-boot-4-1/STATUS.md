@@ -30,11 +30,17 @@ or `/dep-scan 2026-10-15-spring-boot-4-1 <snyk.json>` with an export. Then choos
 
 ## Repos
 
-| Repo | Clone (`repos/…`) | Start commit | Baseline (before) | After upgrade | PR |
-|------|-----------------------|--------------|-------------------|---------------|----|
-| learning-java | `learning-java/backend` | `main` @ `5f3f485` | ✅ green — 39/0/0/0, boots ([summary](verification/baseline/learning-java/summary.json)) | | |
+| Repo | Type | Folder | Start commit | Baseline (before) | After upgrade | PR |
+|------|------|--------|--------------|-------------------|---------------|----|
+| learning-java | local | `~/repos/learning-java` (`path=backend`) | `dep-upgrade-copilot-snyk` @ `b4bacd1` | ✅ green — 39/0/0/0, boots ([summary](verification/baseline/learning-java/summary.json)) | | |
 
 ## Decisions and open questions
+
+- 2026-10-15 — `learning-java` switched from a separate clone to the local folder `~/repos/learning-java`
+  (user chose "local path or URL"). Baseline re-run there. **Open:** that checkout is on
+  `dep-upgrade-copilot-snyk`, not `main` (it's 1 commit behind `origin/main`, the PR merge, with identical files).
+  Switch it with `git -C ~/repos/learning-java switch main && git pull` before `/dep-apply`, so the upgrade
+  branch starts from `main`.
 
 - 2026-10-15 — **Open:** reported current 3.5.16 ≠ resolved 3.3.2 (see 02-inventory Discrepancies).
 - 2026-10-15 — **Open:** Camel target 4.22.1 vs 4.23.0 (both built on Boot 4.1.1); prefer the LTS line — phase 3 to confirm.

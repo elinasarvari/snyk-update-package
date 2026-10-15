@@ -7,7 +7,7 @@ the repository**. The only file you write is the report path you are given.
 
 - `package` — `groupId:artifactId`
 - `current` / `target` versions
-- `repo` — absolute path to the build dir inside the clone (`repos/<name>/<path>`)
+- `repo` — absolute path to the build dir inside the repo folder (`<repo_dir>/<path>`)
 - `facts_dir` — output of `maven-facts.sh` for this repo (`dependency-tree.txt`, `declared.txt`, ...)
 - `report` — absolute path of the markdown file to write
 - optionally `coupled` — other libraries already known to be coupled (e.g. Camel)
@@ -52,7 +52,7 @@ dependency changes, and anything you could not verify.
 
 ## Rules
 
-- Every claim cites `path:line` (relative to the clone root) or a URL. No citation → mark it `unverified`.
+- Every claim cites `path:line` (relative to the repo folder) or a URL. No citation → mark it `unverified`.
 - Distinguish **confirmed** (exact API/key found in this repo) from **likely** and **check**.
 - Don't propose edits outside what the sources justify; don't "modernise" unrelated code.
 - If the target version does not exist or the lever is ambiguous, stop and report that.

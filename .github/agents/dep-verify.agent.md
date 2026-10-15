@@ -1,6 +1,6 @@
 ---
 name: "dep-verify"
-description: "Phase 5 (or health check with 'baseline') - build, test and smoke-boot every cloned repo via repo-verifier subagents, compare to the baseline and Snyk before/after, write 05-verification.md with a go/no-go verdict."
+description: "Phase 5 (or health check with 'baseline') - build, test and smoke-boot every repo via repo-verifier subagents, compare to the baseline and Snyk before/after, write 05-verification.md with a go/no-go verdict."
 argument-hint: "<upgrade-id | baseline> [repo-name ...]"
 tools: ["read", "search", "web/fetch", "execute/runInTerminal", "execute/getTerminalOutput", "edit/editFiles", "todo", "agent"]
 agents: ["repo-verifier"]

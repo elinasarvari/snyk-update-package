@@ -1,11 +1,11 @@
 {
-  "repo": "/Users/elina.sarvari/repos/snyk-update-package/repos/learning-java/backend",
-  "branch": "main",
-  "commit": "5f3f485",
+  "repo": "/Users/elina.sarvari/repos/learning-java/backend",
+  "branch": "dep-upgrade-copilot-snyk",
+  "commit": "b4bacd1",
   "java": "openjdk version \"21.0.12\" 2026-07-21",
   "build_cmd": "./mvnw -B clean verify",
   "build_exit": 0,
-  "duration_s": 24,
+  "duration_s": 18,
   "tests": {
     "tests": 39,
     "failures": 0,
