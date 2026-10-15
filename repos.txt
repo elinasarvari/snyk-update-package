@@ -1,0 +1,15 @@
+# Target repositories - the repos this project clones, scans, upgrades and verifies.
+#
+#   <name>  <git-url>  [branch=<b>] [path=<subdir>] [smoke=true] [build="<cmd>"]
+#
+#   name    folder name under workspace/ (and the name you use in commands)
+#   branch  branch to clone and refresh (default: the remote's default branch)
+#   path    sub-folder holding pom.xml / build.gradle (default: repo root)
+#   smoke   also start the packaged app during verification and wait for "Started ... in"
+#   build   override the auto-detected build (./mvnw -B clean verify / ./gradlew clean build)
+#
+# Add one with:  python3 -I workflow/scripts/repos.py add <git-url> [name] [path=backend] [smoke=true]
+# or in chat:    /dep-clone <git-url>
+# An upgrade can use its own list: upgrades/<id>/repos.txt (same format).
+
+learning-java  https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true

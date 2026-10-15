@@ -1,0 +1,17 @@
+./pom.xml	parent	org.springframework.boot:spring-boot-starter-parent:3.3.2
+./pom.xml	managed	org.apache.camel.springboot:camel-spring-boot-bom:${camel.version} scope=import
+./pom.xml	dependency	org.springframework.boot:spring-boot-starter-web:(managed)
+./pom.xml	dependency	org.springframework.boot:spring-boot-starter-data-jpa:(managed)
+./pom.xml	dependency	com.h2database:h2:(managed) scope=runtime
+./pom.xml	dependency	org.springframework.boot:spring-boot-starter-validation:(managed)
+./pom.xml	dependency	org.springframework.boot:spring-boot-starter-data-redis:(managed)
+./pom.xml	dependency	org.apache.commons:commons-pool2:(managed)
+./pom.xml	dependency	org.apache.camel.springboot:camel-spring-boot-starter:(managed)
+./pom.xml	dependency	org.apache.camel.springboot:camel-platform-http-starter:(managed)
+./pom.xml	dependency	org.apache.camel.springboot:camel-http-starter:(managed)
+./pom.xml	dependency	org.apache.camel.springboot:camel-jackson-starter:(managed)
+./pom.xml	dependency	org.springframework.boot:spring-boot-devtools:(managed) scope=runtime
+./pom.xml	dependency	org.projectlombok:lombok:(managed)
+./pom.xml	dependency	org.springframework.boot:spring-boot-starter-test:(managed) scope=test
+./pom.xml	dependency	org.apache.camel:camel-test-spring-junit5:(managed) scope=test
+./pom.xml	plugin	org.springframework.boot:spring-boot-maven-plugin:(managed)

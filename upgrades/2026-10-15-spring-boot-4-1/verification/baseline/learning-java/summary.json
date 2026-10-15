@@ -1,0 +1,18 @@
+{
+  "repo": "/Users/elina.sarvari/repos/snyk-update-package/workspace/learning-java/backend",
+  "branch": "main",
+  "commit": "5f3f485",
+  "java": "openjdk version \"21.0.12\" 2026-07-21",
+  "build_cmd": "./mvnw -B clean verify",
+  "build_exit": 0,
+  "duration_s": 19,
+  "tests": {
+    "tests": 39,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "failed_tests": []
+  },
+  "smoke": "started",
+  "status": "green"
+}

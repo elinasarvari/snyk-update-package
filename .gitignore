@@ -1,0 +1,5 @@
+workspace/
+# raw build/boot logs are large and machine-specific; summaries and diagnoses are kept
+*.log
+upgrades/_health/
+.DS_Store
