@@ -70,7 +70,7 @@ class Clones(Sandbox):
 class YourCheckoutIsNeverTouched(Sandbox):
     """A local folder is only a way to find the URL: the work happens in repos/<name>/."""
 
-    def user_checkout(self, name="learning-java"):
+    def user_checkout(self, name="inventory-service"):
         url, seed = self.make_remote(name)
         local = os.path.join(self.home, "repos", name)
         self.git(self.tmp, "clone", "-q", url, local)
@@ -83,10 +83,10 @@ class YourCheckoutIsNeverTouched(Sandbox):
         head = self.git(local, "rev-parse", "HEAD")
         self.manifest()
         self.script("repos.py", "add", local, "path=backend", check=True)
-        self.assertIn("learning-java  %s  path=backend" % url, self.read("repos/repos.txt"))
+        self.assertIn("inventory-service  %s  path=backend" % url, self.read("repos/repos.txt"))
         wf = self.script("workflows.py", "new", "lj", check=True).stdout.split("\t")[0]
         self.script("repos.py", "--workflow", wf, "clone", check=True)
-        self.assertEqual(self.git(os.path.join(self.root, "repos", "learning-java"), "rev-parse", "--abbrev-ref", "HEAD"),
+        self.assertEqual(self.git(os.path.join(self.root, "repos", "inventory-service"), "rev-parse", "--abbrev-ref", "HEAD"),
                          "deps/wf-001", "the work happens in the clone")
         # your checkout: same branch, same commit, same uncommitted work, no workflow branch
         self.assertEqual(self.git(local, "rev-parse", "--abbrev-ref", "HEAD"), "my-feature")
@@ -96,7 +96,7 @@ class YourCheckoutIsNeverTouched(Sandbox):
 
     def test_a_local_folder_line_in_the_list_is_rejected_with_its_url(self):
         url, _, _ = self.user_checkout()
-        self.manifest("learning-java  ~/repos/learning-java")
+        self.manifest("inventory-service  ~/repos/inventory-service")
         proc = self.script("repos.py", "list")
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("list its git URL instead: %s" % url, proc.stdout)

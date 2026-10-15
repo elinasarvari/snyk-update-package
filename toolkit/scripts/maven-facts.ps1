@@ -3,7 +3,7 @@
 # Works in Windows PowerShell 5.1 and PowerShell 7.
 #
 # Usage: maven-facts.ps1 <repo-dir> <out-dir> [artifact-filter ...]
-#   e.g. powershell -ExecutionPolicy Bypass -File toolkit\scripts\maven-facts.ps1 repos\learning-java\backend out spring-boot camel
+#   e.g. powershell -ExecutionPolicy Bypass -File toolkit\scripts\maven-facts.ps1 repos\inventory-service\backend out spring-boot camel
 #
 # Outputs in <out-dir>: facts.env, dependency-tree.txt, filtered-tree.txt, declared.txt, version-props.txt
 . (Join-Path $PSScriptRoot 'common.ps1')

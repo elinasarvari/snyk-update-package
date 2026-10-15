@@ -2,7 +2,7 @@
 """Manage the repos to fix: the list (repos/repos.txt), their clones, and each workflow's branch.
 
 Every repo is cloned into  <project>/repos/<name>/  (git-ignored) - the code changes happen there.
-Your own checkouts elsewhere (e.g. ~/repos/learning-java) are never touched: a local folder you
+Your own checkouts elsewhere (e.g. ~/repos/inventory-service) are never touched: a local folder you
 pass to `add`/`ensure` is only used to find its git URL, which is what goes in the list.
 
 Each workflow works on its own branch in the clone:  deps/wf-NNN,  created from the latest main

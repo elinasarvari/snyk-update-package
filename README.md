@@ -22,11 +22,11 @@ repo's GitHub as a pull request. Your own checkouts elsewhere (e.g. `~/repos/...
 snyk-update-package/
 ├── workflows/                    ← TRACKING: one folder per workflow run
 │   ├── INDEX.md                  ← every run, current step, next step (auto-generated)
-│   └── wf-002-learning-java/     ← Workflow 2: STATUS.md, documents, history
+│   └── wf-002-inventory-service/ ← Workflow 2: STATUS.md, documents, history
 ├── repos/
 │   ├── repos.txt                 ← the list of repos to fix (git URLs, you edit this)
 │   ├── README.md                 ← how to add and clone repos
-│   └── learning-java/            ← the CLONE: code changes happen here, on deps/wf-NNN (git-ignored)
+│   └── inventory-service/        ← the CLONE: code changes happen here, on deps/wf-NNN (git-ignored)
 └── toolkit/                      ← how each step works (scripts, procedures, templates)
 ```
 
@@ -63,9 +63,9 @@ No CLI allowed where you are? Pass a Snyk JSON export to `/dep-scan` or `/dep-ru
 `/dep-run <git-url>` adds the line for you):
 
 ```text
-# <name>        <git-url>                                          [options]
-learning-java   https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true
-orders-service  git@github.com:my-org/orders-service.git           branch=develop
+# <name>           <git-url>                                           [options]
+inventory-service  https://github.com/acme-corp/inventory-service.git  path=backend  smoke=true
+orders-service     git@github.com:my-org/orders-service.git            branch=develop
 ```
 
 - `name`: the clone folder `repos/<name>/`, and the name you use in commands
@@ -93,10 +93,10 @@ Every option, HTTPS vs SSH, private repos, and what each message means: **[repos
 **5. Run it: the easy way.** Give `/dep-run` one repo (its name, its git URL, or a checkout of it):
 
 ```text
-/dep-run learning-java                      a repo already in repos/repos.txt
+/dep-run inventory-service                      a repo already in repos/repos.txt
 /dep-run ~/repos/orders-service             a checkout you have: its URL is added, then cloned into repos/
 /dep-run https://github.com/acme/billing.git     a git URL: added and cloned into repos/
-/dep-run learning-java ~/Downloads/snyk.json    use a Snyk export instead of running the CLI
+/dep-run inventory-service ~/Downloads/snyk.json    use a Snyk export instead of running the CLI
 ```
 
 It opens **Workflow N (`wf-NNN`)** for that repo, or resumes the unfinished one, and runs **every step by
@@ -104,7 +104,7 @@ itself**: clone → Snyk scan → inventory → impact + plan. It **stops only w
 
 | It stops when | You reply / run |
 |---------------|-----------------|
-| the plan is ready (always) | read `workflows/wf-NNN-…/03-plan.md`, then `/dep-run learning-java approve`, or the *Approve* button in Copilot. It then applies and verifies |
+| the plan is ready (always) | read `workflows/wf-NNN-…/03-plan.md`, then `/dep-run inventory-service approve`, or the *Approve* button in Copilot. It then applies and verifies |
 | verification finished (always) | green: `/dep-publish wf-NNN` to push and open the PR (always your own command). Red: it lists the fixes |
 | something blocks it | what it asks for, e.g. install Snyk, pick the starting version, commit your local changes |
 
@@ -220,7 +220,7 @@ python3 -I toolkit/scripts/repos.py clone                          # clone/refre
 python3 -I toolkit/scripts/repos.py status                         # branch, dirty, ahead/behind
 bash toolkit/scripts/snyk-scan.sh /tmp/snyk                        # scan every repo
 python3 -I toolkit/scripts/parse-snyk.py /tmp/snyk/*.json --md findings.md --csv findings.csv
-bash toolkit/scripts/verify-repo.sh repos/learning-java/backend /tmp/verify --smoke
+bash toolkit/scripts/verify-repo.sh repos/inventory-service/backend /tmp/verify --smoke
 ```
 
 Windows (PowerShell). Same scripts and arguments, `.ps1` instead of `.sh`, `py -3` instead of `python3`:
@@ -230,7 +230,7 @@ py -3 -I toolkit\scripts\repos.py clone
 py -3 -I toolkit\scripts\repos.py status
 powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-scan.ps1 $env:TEMP\snyk
 py -3 -I toolkit\scripts\parse-snyk.py (Get-ChildItem $env:TEMP\snyk\*.json) --md findings.md --csv findings.csv
-powershell -ExecutionPolicy Bypass -File toolkit\scripts\verify-repo.ps1 repos\learning-java\backend $env:TEMP\verify --smoke
+powershell -ExecutionPolicy Bypass -File toolkit\scripts\verify-repo.ps1 repos\inventory-service\backend $env:TEMP\verify --smoke
 ```
 
 ## Testing: are the commands doing the right job?

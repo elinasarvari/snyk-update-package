@@ -158,7 +158,7 @@ class FrontmatterAndLinks(unittest.TestCase):
         for rel in sources:
             for ref in re.findall(r"`((?:toolkit|tools|repos|workflows|\.github|\.claude)/[^`\s]*)", read(rel)):
                 ref = ref.rstrip("/.,):")
-                if any(ch in ref for ch in "<>{}*…") or ref.startswith(("workflows/wf-", "workflows/_health", "repos/learning-java")):
+                if any(ch in ref for ch in "<>{}*…") or ref.startswith(("workflows/wf-", "workflows/_health", "repos/inventory-service")):
                     continue                                   # placeholders / generated-at-runtime paths
                 if not os.path.exists(os.path.join(PROJECT, ref)):
                     missing.append("%s -> %s" % (rel, ref))

@@ -4,7 +4,7 @@
 #
 # Usage (from the project root):
 #   powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-scan.ps1 <out-dir> [--workflow <id> | --manifest <file>] [extra snyk args...]
-#   e.g. ... snyk-scan.ps1 workflows\wf-002-learning-java\snyk --workflow 2 --org=my-org
+#   e.g. ... snyk-scan.ps1 workflows\wf-002-inventory-service\snyk --workflow 2 --org=my-org
 #
 # Which Snyk CLI is used, in this order:
 #   1. $env:SNYK_CLI   - e.g. the CLI your Snyk VS Code extension downloaded (path in the extension's settings):

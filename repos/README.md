@@ -7,20 +7,20 @@ in `workflows/`, not in the repo.
 ```text
 snyk-update-package/
 ├── workflows/
-│   └── wf-002-learning-java/      ← tracking for Workflow 2: STATUS.md, docs, history
+│   └── wf-002-inventory-service/  ← tracking for Workflow 2: STATUS.md, docs, history
 └── repos/
     ├── README.md                  ← this guide                       (committed)
     ├── repos.txt                  ← THE LIST: git URLs               (committed - you edit this)
-    └── learning-java/             ← the clone: code changes go here  (NOT committed - git-ignored)
+    └── inventory-service/         ← the clone: code changes go here  (NOT committed - git-ignored)
         branches: main, deps/wf-001, deps/wf-002   ← one branch per workflow, each from the latest main
 
-~/repos/learning-java/             ← your own checkout, if you have one: never touched
+~/repos/inventory-service/         ← your own checkout, if you have one: never touched
 ```
 
 - **Your own checkouts are never touched.** The workflow never switches their branch, never edits them, and
   never creates branches in them.
-- **The clone is a normal git repo.** You can open `repos/learning-java/` in VS Code to look at a workflow's
-  changes, e.g. `git -C repos/learning-java diff main...deps/wf-002`.
+- **The clone is a normal git repo.** You can open `repos/inventory-service/` in VS Code to look at a workflow's
+  changes, e.g. `git -C repos/inventory-service diff main...deps/wf-002`.
 - **The changes reach the repo's GitHub as a pull request** from branch `deps/wf-NNN` (`/dep-publish`). Nothing
   is ever pushed to `main`.
 - **No submodules.** This project never records the repos inside itself; only `repos.txt` and this README are
@@ -33,9 +33,9 @@ snyk-update-package/
 Add one line per repo to [`repos.txt`](repos.txt):
 
 ```text
-<name>          <git-url>                                          [options]
-learning-java   https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true
-orders-service  git@github.com:my-org/orders-service.git           branch=develop
+<name>             <git-url>                                           [options]
+inventory-service  https://github.com/acme-corp/inventory-service.git  path=backend  smoke=true
+orders-service     git@github.com:my-org/orders-service.git            branch=develop
 ```
 
 | Part | Required | Meaning | Example |
@@ -100,7 +100,7 @@ branch:
 
 | Message | Meaning |
 |---------|---------|
-| `created deps/wf-002 from origin/main @ 5f3f485` | New workflow: a fresh branch from the **latest** main |
+| `created deps/wf-002 from origin/main @ a1b2c3d` | New workflow: a fresh branch from the **latest** main |
 | `switched back to existing deps/wf-001` / `on deps/wf-001` | Resuming a workflow: its earlier work is still there |
 | `BLOCKED: … unpublished changes of workflow wf-001` | Another workflow's changes aren't published yet. Nothing was switched. Publish or abandon that one first |
 | `NO 'main' BRANCH` | The repo's main branch has another name: add `branch=<name>` to its line |
