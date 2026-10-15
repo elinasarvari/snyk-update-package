@@ -4,7 +4,7 @@ import json
 import os
 import stat
 
-from helpers import Sandbox
+from helpers import ON_WINDOWS, BashScripts, PowerShellScripts, Sandbox
 
 
 def vuln(vid, pkg, version, severity, path, upgrade, fixed, cves=(), kind=None, upgradable=True):
@@ -98,113 +98,134 @@ class ParseSnyk(Sandbox):
                                         "fixed_in", "introduced_via", "remediation", "projects"})
 
 
-class SnykScan(Sandbox):
+FAKE_SNYK = """import json, os, sys
+args = sys.argv[1:]
+with open(%(log)r, "a", encoding="utf-8") as fh:
+    fh.write("%%s | %%s %%s\\n" %% (%(ident)r, os.path.realpath(os.getcwd()), " ".join(args)))
+if args[:1] == ["config"]:
+    sys.exit(%(config_exit)d)
+if args[:1] == ["whoami"]:
+    sys.exit(%(whoami_exit)d)
+print(json.dumps(json.loads(%(report)r)))
+sys.exit(%(test_exit)d)
+"""
+
+
+class SnykScanTests:
+    """snyk-scan.sh / snyk-scan.ps1 with a fake `snyk` CLI (a small Python program)."""
+
     def fake_snyk(self, test_exit=1, authenticated=True, path=None, sso_only=False):
-        """A fake CLI. sso_only: logged in via browser/OAuth, so `config get api` finds no token."""
-        bin_dir = os.path.join(self.tmp, "bin")
-        report = json.dumps([{"projectName": "x", "vulnerabilities": [H2]}]).replace("'", "'\\''")
-        path = self.write(path or os.path.join(bin_dir, "snyk"), "\n".join([
-            "#!/bin/bash",
-            'echo "$0 | $PWD $*" >> "%s/calls.log"' % self.tmp,
-            'if [ "$1" = config ]; then exit %d; fi' % (0 if authenticated and not sso_only else 2),
-            'if [ "$1" = whoami ]; then exit %d; fi' % (0 if authenticated else 2),
-            "echo '%s'" % report,
-            "exit %d" % test_exit, ""]))
-        os.chmod(path, os.stat(path).st_mode | stat.S_IEXEC)
-        return dict(self.env, PATH=bin_dir + os.pathsep + self.env["PATH"])
+        """Install a fake CLI at `path` (default: a bin dir put first on PATH). Returns (env, launcher).
+        sso_only: logged in via browser/OAuth, so `config get api` finds no token but `whoami` works."""
+        on_path = path is None
+        base = path or os.path.join(self.tmp, "bin", "snyk")
+        report = json.dumps([{"projectName": "x", "vulnerabilities": [H2]}])
+        launcher = self.make_tool(base, FAKE_SNYK % {
+            "log": os.path.join(self.tmp, "calls.log"), "ident": base, "report": report, "test_exit": test_exit,
+            "config_exit": 0 if authenticated and not sso_only else 2, "whoami_exit": 0 if authenticated else 2})
+        env = dict(self.env)
+        if on_path:
+            env["PATH"] = os.path.dirname(base) + os.pathsep + env["PATH"]
+        return env, launcher
 
     def env_without_snyk(self):
-        return dict(self.env, PATH=os.pathsep.join(d for d in self.env["PATH"].split(os.pathsep)
-                                                   if not os.path.exists(os.path.join(d, "snyk"))))
+        names = ("snyk", "snyk.exe", "snyk.cmd")
+        keep = [d for d in self.env["PATH"].split(os.pathsep) if not any(os.path.exists(os.path.join(d, n)) for n in names)]
+        return dict(self.env, PATH=os.pathsep.join(keep))
+
+    def calls(self):
+        path = os.path.join(self.tmp, "calls.log")
+        return self.read(path) if os.path.exists(path) else ""
 
     def cloned_repo(self, name):
         url, _ = self.make_remote(name)
         self.git(self.tmp, "clone", "-q", url, os.path.join(self.root, "repos", name))
         return url
 
+    def clone_dir(self, name):
+        return os.path.realpath(os.path.join(self.root, "repos", name))
+
     def test_missing_cli_exits_127_with_install_help(self):
-        env = dict(self.env, PATH=os.pathsep.join(d for d in self.env["PATH"].split(os.pathsep)
-                                                    if not os.path.exists(os.path.join(d, "snyk"))))
         self.manifest()
-        proc = self.script("snyk-scan.sh", "out", env=env)
+        proc = self.script("snyk-scan.sh", "out", env=self.env_without_snyk())
         self.assertEqual(proc.returncode, 127)
-        self.assertIn("brew install snyk-cli", proc.stdout)
+        self.assertIn("install", proc.stdout.lower())
+        self.assertIn("SNYK_CLI", proc.stdout)
+        self.assertIn("same SSO account", proc.stdout)
 
     def test_unauthenticated_cli_exits_126(self):
         self.manifest()
-        self.assertEqual(self.script("snyk-scan.sh", "out", env=self.fake_snyk(authenticated=False)).returncode, 126)
+        env, _ = self.fake_snyk(authenticated=False)
+        self.assertEqual(self.script("snyk-scan.sh", "out", env=env).returncode, 126)
 
-    def test_scans_each_repo_folder_and_records_results(self):
-        url = self.cloned_repo("svc-a")
-        self.manifest("svc-a  %s" % url, "ghost  https://example.com/ghost.git")
-        proc = self.script("snyk-scan.sh", "out", "--org=acme", env=self.fake_snyk(test_exit=1))
+    def test_sso_login_without_a_token_is_accepted(self):
+        self.manifest("svc-a  %s" % self.cloned_repo("svc-a"))
+        env, _ = self.fake_snyk(sso_only=True)
+        proc = self.script("snyk-scan.sh", "out", env=env)
         self.assertEqual(proc.returncode, 0, proc.stdout)
-        with open(os.path.join(self.root, "out", "svc-a.json")) as fh:
+        self.assertTrue(os.path.isfile(os.path.join(self.root, "out", "svc-a.json")))
+
+    def test_scans_each_clone_and_records_results(self):
+        self.manifest("svc-a  %s" % self.cloned_repo("svc-a"), "ghost  https://example.com/ghost.git")
+        env, _ = self.fake_snyk(test_exit=1)
+        proc = self.script("snyk-scan.sh", "out", "--org=acme", env=env)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        with open(os.path.join(self.root, "out", "svc-a.json"), encoding="utf-8") as fh:
             self.assertEqual(json.load(fh)[0]["vulnerabilities"][0]["id"], "SNYK-H2-3")
         index = self.read("out/scan-index.tsv")
         self.assertIn("svc-a\t%s\t1\tvulnerabilities found" % os.path.join(self.root, "repos", "svc-a"), index)
         self.assertIn("ghost", index)
         self.assertIn("not cloned", index)
-        calls = self.read(os.path.join(self.tmp, "calls.log"))
-        self.assertIn("| %s test --all-projects --json --org=acme" % os.path.join(self.root, "repos", "svc-a"), calls,
-                      "runs inside the repo folder and passes extra args through")
+        self.assertIn("| %s test --all-projects --json --org=acme" % self.clone_dir("svc-a"), self.calls(),
+                      "runs inside the clone and passes extra args through")
 
     def test_workflow_option_scans_only_that_workflows_repos(self):
-        a, b = self.cloned_repo("svc-a"), self.cloned_repo("svc-b")
-        self.manifest("svc-a  %s" % a, "svc-b  %s" % b)
+        self.manifest("svc-a  %s" % self.cloned_repo("svc-a"), "svc-b  %s" % self.cloned_repo("svc-b"))
         wf = self.script("workflows.py", "new", "a-only", "--repo", "svc-a", check=True).stdout.split("\t")[0]
-        proc = self.script("snyk-scan.sh", "out", "--workflow", wf, env=self.fake_snyk())
+        env, _ = self.fake_snyk()
+        proc = self.script("snyk-scan.sh", "out", "--workflow", wf, env=env)
         self.assertEqual(proc.returncode, 0, proc.stdout)
         self.assertTrue(os.path.isfile(os.path.join(self.root, "out", "svc-a.json")))
         self.assertFalse(os.path.exists(os.path.join(self.root, "out", "svc-b.json")))
 
-    # --- which CLI, and SSO logins ------------------------------------------------------------
-    def test_sso_login_without_a_token_is_accepted(self):
-        url = self.cloned_repo("svc-a")
-        self.manifest("svc-a  %s" % url)
-        proc = self.script("snyk-scan.sh", "out", env=self.fake_snyk(sso_only=True))
-        self.assertEqual(proc.returncode, 0, proc.stdout)
-        self.assertTrue(os.path.isfile(os.path.join(self.root, "out", "svc-a.json")))
-
     def test_snyk_cli_setting_points_at_the_extensions_cli(self):
-        url = self.cloned_repo("svc-a")
-        self.manifest("svc-a  %s" % url)
-        cli = os.path.join(self.tmp, "vscode-ext", "snyk-macos-arm64")
-        self.fake_snyk(path=cli)
-        env = dict(self.env_without_snyk(), SNYK_CLI=cli)
-        proc = self.script("snyk-scan.sh", "out", env=env)
+        self.manifest("svc-a  %s" % self.cloned_repo("svc-a"))
+        base = os.path.join(self.tmp, "vscode-ext", "snyk-cli")
+        _, launcher = self.fake_snyk(path=base)
+        proc = self.script("snyk-scan.sh", "out", env=dict(self.env_without_snyk(), SNYK_CLI=launcher))
         self.assertEqual(proc.returncode, 0, proc.stdout)
-        self.assertIn("Using Snyk CLI: %s" % cli, proc.stdout)
-        self.assertIn("%s | %s test" % (cli, os.path.join(self.root, "repos", "svc-a")),
-                      self.read(os.path.join(self.tmp, "calls.log")))
+        self.assertIn("Using Snyk CLI: %s" % launcher, proc.stdout)
+        self.assertIn("%s | %s test" % (base, self.clone_dir("svc-a")), self.calls())
 
     def test_snyk_cli_setting_wins_over_snyk_on_path(self):
-        url = self.cloned_repo("svc-a")
-        self.manifest("svc-a  %s" % url)
-        env = self.fake_snyk()                                  # one `snyk` on PATH ...
-        cli = os.path.join(self.tmp, "other", "snyk-custom")
-        self.fake_snyk(path=cli)                                # ... and the one SNYK_CLI names
-        proc = self.script("snyk-scan.sh", "out", env=dict(env, SNYK_CLI=cli))
-        self.assertIn("Using Snyk CLI: %s" % cli, proc.stdout)
+        self.manifest("svc-a  %s" % self.cloned_repo("svc-a"))
+        env, _ = self.fake_snyk()                                   # one `snyk` on PATH ...
+        _, launcher = self.fake_snyk(path=os.path.join(self.tmp, "other", "snyk-custom"))   # ... and SNYK_CLI's
+        proc = self.script("snyk-scan.sh", "out", env=dict(env, SNYK_CLI=launcher))
+        self.assertIn("Using Snyk CLI: %s" % launcher, proc.stdout)
 
     def test_bad_snyk_cli_setting_is_reported(self):
         self.manifest()
-        proc = self.script("snyk-scan.sh", "out", env=dict(self.env_without_snyk(), SNYK_CLI="/nope/snyk"))
+        missing = os.path.join(self.tmp, "nope", "snyk")
+        proc = self.script("snyk-scan.sh", "out", env=dict(self.env_without_snyk(), SNYK_CLI=missing))
         self.assertEqual(proc.returncode, 127)
-        self.assertIn("SNYK_CLI is set to '/nope/snyk', but that is not an executable file", proc.stdout)
+        self.assertIn("SNYK_CLI is set to '%s', but that is not an executable file" % missing, proc.stdout)
 
     def test_cli_downloaded_by_the_vscode_extension_is_found_automatically(self):
-        url = self.cloned_repo("svc-a")
-        self.manifest("svc-a  %s" % url)
-        cli = os.path.join(self.home, "Library", "Application Support", "snyk", "snyk-macos-arm64")
-        self.fake_snyk(path=cli)
+        self.manifest("svc-a  %s" % self.cloned_repo("svc-a"))
+        if ON_WINDOWS:
+            base = os.path.join(self.env["LOCALAPPDATA"], "snyk", "snyk-win")
+        else:
+            base = os.path.join(self.home, "Library", "Application Support", "snyk", "snyk-macos-arm64")
+        _, launcher = self.fake_snyk(path=base)
         proc = self.script("snyk-scan.sh", "out", env=self.env_without_snyk())
         self.assertEqual(proc.returncode, 0, proc.stdout)
-        self.assertIn("Using Snyk CLI: %s" % cli, proc.stdout)
+        self.assertIn("Using Snyk CLI: %s" % launcher, proc.stdout)
 
-    def test_missing_cli_message_explains_the_vscode_option(self):
-        self.manifest()
-        proc = self.script("snyk-scan.sh", "out", env=self.env_without_snyk())
-        self.assertEqual(proc.returncode, 127)
-        self.assertIn("export SNYK_CLI=", proc.stdout)
-        self.assertIn("same SSO account", proc.stdout)
+
+class SnykScanBash(BashScripts, SnykScanTests, Sandbox):
+    pass
+
+
+class SnykScanPowerShell(PowerShellScripts, SnykScanTests, Sandbox):
+    pass

@@ -36,25 +36,28 @@ snyk-update-package/
 
 **1. Get the project and the tools** (once)
 
-```bash
-git clone https://github.com/elinasarvari/snyk-update-package.git
-cd snyk-update-package
-brew install gh && gh auth login                            # only needed to open PRs at the end
-```
+You need **Git**, **Java** (the version your repos use) and **Python 3.9+**.
 
-You also need Java (the version your repos use), Git, and Python 3.9+ (built into macOS).
+| | macOS (Terminal) | Windows (PowerShell) |
+|---|---|---|
+| Tools | Python is built in. `brew install git openjdk@21` if missing | Install [Git for Windows](https://git-scm.com/download/win), [Python](https://www.python.org/downloads/windows/) (tick **"Add python.exe to PATH"**; `py -3 --version` should work) and a JDK (e.g. `winget install EclipseAdoptium.Temurin.21.JDK`). PowerShell 5.1 is built in |
+| Get the project | `git clone https://github.com/elinasarvari/snyk-update-package.git`<br>`cd snyk-update-package` | the same two commands |
+| GitHub CLI (only to open PRs at the end) | `brew install gh && gh auth login` | `winget install GitHub.cli` then `gh auth login` |
+
+On Windows, scripts run with `powershell -ExecutionPolicy Bypass -File <script>.ps1 ...`, which works without
+changing any system setting. Each bash script `x.sh` has a PowerShell twin `x.ps1` with the same arguments.
 
 **The Snyk CLI**, which the scan step uses. Pick one:
 
-| You have | Do this once |
-|----------|--------------|
-| **The Snyk VS Code extension** (it already downloaded the CLI) | Find the CLI path in the extension's settings (Snyk → Advanced → CLI path) and add `export SNYK_CLI="<that path>"` to your `~/.zshrc`. Common download locations are also found automatically |
-| Nothing yet | `brew tap snyk/tap && brew install snyk-cli` (or `npm install -g snyk`) |
+| You have | macOS | Windows (PowerShell) |
+|----------|-------|----------------------|
+| **The Snyk VS Code extension** (it already downloaded the CLI; the path is in its settings: Snyk → Advanced → CLI path) | `export SNYK_CLI="<that path>"` (add it to `~/.zshrc`) | `$env:SNYK_CLI = "<that path>"`, or to keep it: `[Environment]::SetEnvironmentVariable("SNYK_CLI", "<that path>", "User")` |
+| Nothing yet | `brew tap snyk/tap && brew install snyk-cli` | `npm install -g snyk` (or download `snyk-win.exe` from Snyk's releases) |
 
-Then log in **with the same SSO account as the extension**: `"$SNYK_CLI" auth` (or `snyk auth`). It opens your
-browser for the SSO sign-in; nothing is shared with or read from the extension. Check with
-`"$SNYK_CLI" whoami --experimental`. No CLI allowed where you are? Pass a Snyk JSON export to `/dep-scan` or
-`/dep-run` instead.
+Common download locations of the extension's CLI are also found automatically. Then log in **with the same SSO
+account as the extension**: `"$SNYK_CLI" auth` on macOS, `& $env:SNYK_CLI auth` on Windows (or just `snyk auth`).
+It opens your browser for the SSO sign-in; nothing is read from the extension. Check with `whoami --experimental`.
+No CLI allowed where you are? Pass a Snyk JSON export to `/dep-scan` or `/dep-run` instead.
 
 **2. List the repos you want to fix** in [`repos/repos.txt`](repos/repos.txt), one line each (or skip this:
 `/dep-run <git-url>` adds the line for you):
@@ -74,8 +77,13 @@ orders-service  git@github.com:my-org/orders-service.git           branch=develo
 **3. Clone them** into `repos/` (optional: `/dep-run` does this as its first step):
 
 ```bash
-python3 -I toolkit/scripts/repos.py clone      # clones missing repos, updates clean ones on main
+python3 -I toolkit/scripts/repos.py clone      # macOS: clones missing repos, updates clean ones on main
 python3 -I toolkit/scripts/repos.py status     # branch, commit, uncommitted files per clone
+```
+
+```powershell
+py -3 -I toolkit\scripts\repos.py clone          # Windows (PowerShell): the same
+py -3 -I toolkit\scripts\repos.py status
 ```
 
 Every option, HTTPS vs SSH, private repos, and what each message means: **[repos/README.md](repos/README.md)**.
@@ -186,6 +194,8 @@ workflows/wf-001-spring-boot-4-1/
 | `toolkit/templates/*.md` | Blank templates for each document above | to change doc layout |
 | `toolkit/scripts/repos.py` | Add / check+clone / list / status of target repos | — |
 | `toolkit/scripts/workflows.py` | Workflow ids: new run, resolve `1`→folder, step states, history, index | — |
+| `toolkit/scripts/*.ps1`, `common.ps1` | PowerShell twins of the `.sh` scripts (Windows PowerShell 5.1 and 7), same arguments and outputs | when you change its `.sh` twin |
+| `toolkit/scripts/script-helpers.py` | Parsing shared by the bash and PowerShell scripts (JUnit, pom.xml, summary.json) | — |
 | `toolkit/scripts/snyk-scan.sh` | Snyk scan of every repo in the list | — |
 | `toolkit/scripts/parse-snyk.py` | Snyk JSON → findings tables + CSV | — |
 | `toolkit/scripts/maven-facts.sh` | What a repo's pom really resolves | — |
@@ -194,8 +204,8 @@ workflows/wf-001-spring-boot-4-1/
 | `.github/skills/dep-upgrade/SKILL.md`, `.github/copilot-instructions.md`, `.github/instructions/` | Copilot context and pom-editing rules | rarely |
 | `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` | Claude Code commands and subagents (**generated**, except `CLAUDE.md`) | no, regenerate |
 | `tools/generate-entrypoints.py` | Regenerates the Copilot and Claude files from one spec | when adding a command |
-| `tests/` | Automated tests for every script and command (`tests/run.sh`) | when changing behaviour |
-| `.github/workflows/tests.yml` | Runs the tests on GitHub after every push (Linux + macOS) | rarely |
+| `tests/` | Automated tests for every script and command (`tests/run.sh`, `tests\\run.ps1`), run locally | when changing behaviour |
+| `.gitattributes` | Keeps LF line endings on Windows checkouts, so the bash scripts keep working | no |
 
 To change how a step works, edit its file in `toolkit/phases/`. Both assistants pick it up immediately.
 To add or rename a command, or change a handoff button, edit `tools/generate-entrypoints.py`, then run
@@ -203,32 +213,51 @@ To add or rename a command, or change a handoff button, edit `tools/generate-ent
 
 ## The scripts work without an assistant too
 
+macOS / Linux:
+
 ```bash
 python3 -I toolkit/scripts/repos.py clone                          # clone/refresh every repo into repos/
 python3 -I toolkit/scripts/repos.py status                         # branch, dirty, ahead/behind
 bash toolkit/scripts/snyk-scan.sh /tmp/snyk                        # scan every repo
 python3 -I toolkit/scripts/parse-snyk.py /tmp/snyk/*.json --md findings.md --csv findings.csv
-bash toolkit/scripts/verify-repo.sh ~/repos/learning-java/backend /tmp/verify --smoke
+bash toolkit/scripts/verify-repo.sh repos/learning-java/backend /tmp/verify --smoke
+```
+
+Windows (PowerShell). Same scripts and arguments, `.ps1` instead of `.sh`, `py -3` instead of `python3`:
+
+```powershell
+py -3 -I toolkit\scripts\repos.py clone
+py -3 -I toolkit\scripts\repos.py status
+powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-scan.ps1 $env:TEMP\snyk
+py -3 -I toolkit\scripts\parse-snyk.py (Get-ChildItem $env:TEMP\snyk\*.json) --md findings.md --csv findings.csv
+powershell -ExecutionPolicy Bypass -File toolkit\scripts\verify-repo.ps1 repos\learning-java\backend $env:TEMP\verify --smoke
 ```
 
 ## Testing: are the commands doing the right job?
 
-```bash
-tests/run.sh                       # about 40 seconds, safe to run any time
-RUN_MAVEN_TESTS=1 tests/run.sh     # also does a real Maven build of a tiny sample project
-```
+The tests run **locally**, on your machine. There's nothing to set up on GitHub.
+
+| | macOS / Linux | Windows (PowerShell) |
+|---|---|---|
+| Run all tests | `tests/run.sh` | `powershell -ExecutionPolicy Bypass -File tests\run.ps1` |
+| Also a real Maven build | `RUN_MAVEN_TESTS=1 tests/run.sh` | `$env:RUN_MAVEN_TESTS = "1"; powershell -ExecutionPolicy Bypass -File tests\run.ps1` |
+| Test the `.ps1` scripts with PowerShell 7 instead of 5.1 | (uses `pwsh` if installed) | `$env:SUP_PS = "pwsh"` first |
 
 The tests run in **throwaway sandboxes** with fake git remotes, a fake `HOME` and a fake `snyk` CLI. They never touch
-your real repos or GitHub, and never apply an upgrade. They also run on GitHub after every push
-([Actions tab](https://github.com/elinasarvari/snyk-update-package/actions)).
+your real repos or GitHub, and never apply an upgrade.
+
+**Every script test runs twice: against the bash version and against its PowerShell twin.** If a fix lands in only
+one of them, the other version's test goes red. On Windows the bash runs are skipped. On a Mac, the PowerShell runs
+need `pwsh` (`brew install powershell`); without it they're skipped.
 
 | Test file | Proves |
 |-----------|--------|
 | `test_repos.py` | Repos are cloned into `repos/` and refreshed only when clean. **Each workflow gets `deps/wf-NNN` from the latest main**, workflows don't overwrite each other's unpublished work, `release` returns to main. **Your own checkout is never touched** (branch, commit, files). No submodules; clones are never committed |
 | `test_workflows.py` | Workflow 1 = `wf-001`, Workflow 2 = `wf-002`, **ids never reused**. `1` / `wf-001` / folder name all resolve. Step states, next step, History and INDEX update correctly |
-| `test_snyk.py` | Every flagged package listed once with all its paths, severity totals, grouping by the dependency you edit, licence/no-fix rows, CSV. The scan script handles a missing or unauthenticated CLI and scans each clone (or only one workflow's repos) |
-| `test_build_scripts.py` | Build results come from JUnit files, failing tests are named, the build tool is auto-detected, the smoke boot catches "APPLICATION FAILED TO START", and the Maven facts are right |
-| `test_wiring.py` | Every `/dep-*` command (including `/dep-run`) exists for Copilot **and** Claude and points at files that exist. Handoffs and subagents resolve. Generated files are current. **`/dep-apply` and `/dep-publish` can only be started by you**, and the approval gate is in place |
+| `test_snyk.py` | Every flagged package listed once with all its paths, severity totals, grouping by the dependency you edit, licence/no-fix rows, CSV. **Both scan scripts** handle a missing or not-logged-in CLI, `SNYK_CLI`, the VS Code extension's CLI and SSO logins, and scan each clone (or one workflow's repos) |
+| `test_build_scripts.py` | **Both versions** of verify-repo and maven-facts: build results from JUnit files, failing tests named, build tool auto-detected (`mvnw` / `mvnw.cmd`), smoke boot catches "APPLICATION FAILED TO START", nothing left in the repo, Maven facts right |
+| `test_clone_hygiene.py` | End to end, with bash and with PowerShell: clone → scan → build leaves the clone with **no changed files and no commits**; all evidence lands in `workflows/<id>/` |
+| `test_wiring.py` | Every `/dep-*` command exists for Copilot **and** Claude and points at files that exist. Every `.sh` has a `.ps1` twin with the same options, every `.ps1` parses and avoids PowerShell-7-only syntax. **`/dep-apply`, `/dep-publish` and `/dep-run` can only be started by you**, and the approval gate is in place |
 
 What tests can't check is the AI's judgement inside a step, e.g. how good an impact analysis is. That's why
 every document must cite `file:line` or a source URL, and why nothing changes your code without your approval.

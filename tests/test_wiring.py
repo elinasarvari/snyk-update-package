@@ -12,7 +12,7 @@ import sys
 import tempfile
 import unittest
 
-from helpers import PROJECT
+from helpers import ON_WINDOWS, POWERSHELL, PROJECT
 
 PHASES = ["dep-clone", "dep-scan", "dep-inventory", "dep-analyze", "dep-apply", "dep-verify", "dep-publish"]
 COMMANDS = ["dep-upgrade", "dep-run"] + PHASES
@@ -80,7 +80,9 @@ class GeneratedFilesAreCurrent(unittest.TestCase):
                     if rel.startswith("tools"):
                         continue
                     committed = os.path.join(PROJECT, rel)
-                    if not os.path.isfile(committed) or read(rel) != open(os.path.join(base, name), encoding="utf-8").read():
+                    with open(os.path.join(base, name), encoding="utf-8") as fh:
+                        generated = fh.read()
+                    if not os.path.isfile(committed) or read(rel) != generated:
                         stale.append(rel)
             self.assertEqual(stale, [], "run: python3 -I tools/generate-entrypoints.py")
         finally:
@@ -229,14 +231,55 @@ class BranchNamesAreConsistent(unittest.TestCase):
 
 
 class ScriptsAreSound(unittest.TestCase):
+    SCRIPTS = os.path.join(PROJECT, "toolkit", "scripts")
+
+    @unittest.skipIf(ON_WINDOWS, "bash and file modes are not checked on Windows")
     def test_shell_scripts_parse_and_are_executable(self):
-        scripts = os.path.join(PROJECT, "toolkit", "scripts")
-        for f in os.listdir(scripts):
-            path = os.path.join(scripts, f)
+        for f in os.listdir(self.SCRIPTS):
+            path = os.path.join(self.SCRIPTS, f)
             if f.endswith(".sh"):
                 subprocess.run(["bash", "-n", path], check=True)
             if f.endswith((".sh", ".py")):
                 self.assertTrue(os.access(path, os.X_OK), "%s is not executable" % f)
+
+    def test_every_bash_script_has_a_powershell_twin_with_the_same_arguments(self):
+        pairs = [("toolkit/scripts/" + f, "toolkit/scripts/" + f[:-3] + ".ps1")
+                 for f in os.listdir(self.SCRIPTS) if f.endswith(".sh")] + [("tests/run.sh", "tests/run.ps1")]
+        for sh, ps1 in pairs:
+            self.assertTrue(os.path.isfile(os.path.join(PROJECT, ps1)), "missing PowerShell twin: " + ps1)
+            flags_sh = set(re.findall(r"(?<![\w-])--[a-z][a-z-]+", read(sh))) - {"--all-projects", "--json"}
+            flags_ps = set(re.findall(r"(?<![\w-])--[a-z][a-z-]+", read(ps1))) - {"--all-projects", "--json"}
+            self.assertEqual(sorted(flags_sh - flags_ps), [], "%s documents options %s doesn't" % (sh, ps1))
+
+    @unittest.skipUnless(POWERSHELL, "PowerShell not found")
+    def test_powershell_scripts_parse(self):
+        files = [os.path.join(self.SCRIPTS, f) for f in os.listdir(self.SCRIPTS) if f.endswith(".ps1")]
+        files.append(os.path.join(PROJECT, "tests", "run.ps1"))
+        checker = os.path.join(tempfile.mkdtemp(prefix="sup-ps-"), "check.ps1")
+        with open(checker, "w", encoding="utf-8") as fh:
+            fh.write("$bad = 0\nforeach ($f in $args) {\n  $e = $null\n"
+                     "  [void][System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$null, [ref]$e)\n"
+                     "  foreach ($x in @($e)) { if ($x) { Write-Output ($f + ': ' + $x.ToString()); $bad++ } }\n}\nexit $bad\n")
+        proc = subprocess.run([POWERSHELL, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", checker]
+                              + files, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        shutil.rmtree(os.path.dirname(checker), ignore_errors=True)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+
+    def test_powershell_scripts_never_assign_arrays_from_if_expressions(self):
+        """`$x = if (...) { @('a') }` hands back the bare 'a', not an array - a bug we hit twice."""
+        for rel in [os.path.join("toolkit/scripts", f) for f in os.listdir(self.SCRIPTS) if f.endswith(".ps1")] + ["tests/run.ps1"]:
+            for n, line in enumerate(read(rel).splitlines(), 1):
+                if not line.lstrip().startswith("#"):
+                    self.assertNotRegex(line, r"=\s*if\s*\(.*\{\s*@\(", "%s:%d assigns an array from an if-expression" % (rel, n))
+
+    def test_powershell_scripts_avoid_powershell_7_only_syntax(self):
+        """Windows ships PowerShell 5.1: no ?? / ?. / ternary, no -Encoding utf8NoBOM, no $IsWindows."""
+        files = [os.path.join("toolkit/scripts", f) for f in os.listdir(self.SCRIPTS) if f.endswith(".ps1")] + ["tests/run.ps1"]
+        for rel in files:
+            text = "\n".join(l for l in read(rel).splitlines() if not l.lstrip().startswith("#"))
+            for pattern, why in ((r"\?\?", "?? operator"), (r"\?\.", "?. operator"), (r"utf8NoBOM", "utf8NoBOM encoding"),
+                                 (r"\$IsWindows|\$IsMacOS|\$IsLinux", "$IsWindows"), (r"\)\s*\?\s*[^:]+\s:\s", "ternary")):
+                self.assertNotRegex(text, pattern, "%s uses %s (PowerShell 7 only)" % (rel, why))
 
     def test_python_scripts_compile_for_3_9(self):
         for f in os.listdir(os.path.join(PROJECT, "toolkit", "scripts")):

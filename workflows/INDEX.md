@@ -5,3 +5,4 @@
 | # | Id | Title | Started | Current step | ▶ Next step |
 |---|----|-------|---------|--------------|-------------|
 | 1 | [`wf-001`](wf-001-spring-boot-4-1/STATUS.md) | Spring Boot → 4.1.1 (spring-boot-starter-web) | 2026-10-15 | 1 Snyk scan: ⬜ not started (needs Snyk CLI or a JSON export) | Paused by the user: no upgrade will be applied. To resume later, run `/dep-upgrade wf-001`. |
+| 2 | [`wf-002`](wf-002-learning-java/STATUS.md) | Snyk fixes: learning-java | 2026-10-15 | 1 Snyk scan: ⛔ blocked (no Snyk CLI on this machine) | Choose how to get the findings: (a) install + log in to the Snyk CLI, then reply "continue"; (b) give a Sny... |

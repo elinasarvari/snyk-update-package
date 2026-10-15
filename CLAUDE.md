@@ -12,6 +12,9 @@ This is a **meta repository** for Snyk-driven dependency upgrades. It has no app
 - Each workflow run has a unique id (Workflow 1 = `wf-001`, never reused) and its own folder
   `workflows/wf-<NNN>-<slug>/`, starting from `STATUS.md`. Create runs, change step states and log events only
   through `toolkit/scripts/workflows.py`; `workflows/INDEX.md` lists them all.
-- Tests: `tests/run.sh`. Run them after changing anything in `toolkit/` or `tools/`.
+- Windows: use the `.ps1` twin of every `.sh` script and `py -3` for Python (table in `toolkit/WORKFLOW.md`,
+  "Running the commands on Windows").
+- Tests run locally: `tests/run.sh` (macOS/Linux) or `tests\run.ps1` (Windows). Run them after changing anything in
+  `toolkit/` or `tools/`. A change to a `.sh` script must be made in its `.ps1` twin too: the tests run both.
 - Never commit, push or open PRs in a target repo outside `/dep-publish`. Never reset, stash or switch
   branches in a clone with the user's changes. Never skip or disable tests.

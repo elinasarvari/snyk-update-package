@@ -25,6 +25,10 @@ import os
 import re
 import sys
 
+for _stream in (sys.stdout, sys.stderr):        # Windows consoles default to a legacy code page
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORKFLOWS_DIR = os.path.join(ROOT, "workflows")
 TEMPLATE = os.path.join(ROOT, "toolkit", "templates", "STATUS.md")
@@ -37,6 +41,10 @@ STATES = {
     "blocked": "⛔ blocked", "waiting": "⏸ awaiting approval", "skipped": "➖ skipped",
 }
 PHASE_ROW = re.compile(r"^\|\s*(\d)\s*\|")
+
+
+def rel(path):
+    return os.path.relpath(path, ROOT).replace(os.sep, "/")
 
 
 def now(fmt="%Y-%m-%d %H:%M"):
@@ -60,8 +68,8 @@ def make_id(number):
 
 
 def resolve(ref):
-    ref = ref.strip().rstrip("/")
-    ref = os.path.basename(ref) if os.sep in ref else ref
+    ref = ref.strip().replace("\\", "/").rstrip("/")
+    ref = ref.rsplit("/", 1)[-1]
     m = re.match(r"^(?:wf-?)?0*(\d+)(?:-.*)?$", ref, re.IGNORECASE)
     all_wf = workflows()
     if m:
@@ -218,11 +226,11 @@ def cmd_new(args):
               % (wf_id, "\n".join(known[r] for r in wanted)))
     append_history(status, "Workflow %d created (%s)%s" % (number, wf_id, " for " + ", ".join(wanted) if wanted else ""))
     rebuild_index()
-    print("%s\t%s" % (wf_id, os.path.relpath(path, ROOT)))
+    print("%s\t%s" % (wf_id, rel(path)))
 
 
 def cmd_resolve(args):
-    print(os.path.relpath(resolve(args.ref)[3], ROOT))
+    print(rel(resolve(args.ref)[3]))
 
 
 def cmd_list(args):
@@ -236,7 +244,7 @@ def cmd_list(args):
         cur = current_phase(info["phases"]) if info else None
         where = "done" if info and cur is None else ("%d %s" % (cur["n"], cur["state"]) if cur else "?")
         title = re.sub(r"^(Workflow \d+:|Upgrade:)\s*", "", info["title"]) if info else "?"
-        print("%-4d %-8s %-40s %-28s %s" % (number, wf_id, title[:40], where[:28], os.path.relpath(path, ROOT)))
+        print("%-4d %-8s %-40s %-28s %s" % (number, wf_id, title[:40], where[:28], rel(path)))
 
 
 def cmd_phase(args):
@@ -289,7 +297,7 @@ def cmd_show(args):
     info = parse_status(status_path(wf))
     scope = scoped_repos(wf[3])
     print("Workflow %d (%s): %s" % (wf[0], wf[1], re.sub(r"^(Workflow \d+:|Upgrade:)\s*", "", info["title"])))
-    print("Folder:  %s" % os.path.relpath(wf[3], ROOT))
+    print("Folder:  %s" % rel(wf[3]))
     print("Repos:   %s" % (", ".join(scope) if scope else "all of repos/repos.txt"))
     print("Branch:  %s" % ("deps/" + wf[1]))   # same rule as repos.py branch_for()
     print("")
@@ -308,14 +316,14 @@ def cmd_find_open(args):
         if scoped_repos(path) != want or not os.path.isfile(os.path.join(path, "STATUS.md")):
             continue
         if current_phase(parse_status(os.path.join(path, "STATUS.md"))["phases"]) is not None:
-            print("%s\t%s" % (wf_id, os.path.relpath(path, ROOT)))
+            print("%s\t%s" % (wf_id, rel(path)))
             return
     sys.exit(1)                                   # none: the caller starts a new run
 
 
 def cmd_index(_args):
     rebuild_index()
-    print("rebuilt %s" % os.path.relpath(INDEX, ROOT))
+    print("rebuilt %s" % rel(INDEX))
 
 
 def main():

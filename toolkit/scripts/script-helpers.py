@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Shared helpers for the bash (*.sh) and PowerShell (*.ps1) versions of the toolkit scripts.
+
+Anything that parses files or writes JSON lives here, once, so both shell versions behave
+identically and only differ in how they run processes. Python 3.9, stdlib only, any OS.
+
+    script-helpers.py junit <reports-dir> ...          -> JSON test totals from JUnit XML (TEST-*.xml)
+    script-helpers.py pom-declared <pom.xml>           -> one line per parent/managed/dependency/plugin
+    script-helpers.py version-props <pom.xml>          -> <...version> entries of <properties>
+    script-helpers.py project-java <pom.xml>           -> the <java.version> property, or empty
+    script-helpers.py git-snapshot <file>              -> save `git status` of the current folder
+    script-helpers.py left-in-repo <file>              -> JSON list of paths that appeared since the snapshot
+    script-helpers.py env-info                         -> JSON: branch, commit, java (of the current folder)
+    script-helpers.py summary <out.json> [--env] [--fields <file>] [k=v | k:=<json> ...]
+                                                       -> write (and print) a summary object. --env adds
+                                                          branch/commit/java of the current folder. --fields
+                                                          reads the same k=v / k:=json pairs, one per line, from a
+                                                          file (used by PowerShell 5.1, which mangles quotes in
+                                                          arguments passed to other programs)
+    script-helpers.py first-errors <log> [max]         -> the first error-looking lines of a build log
+    script-helpers.py filter-tree <tree> <out> <word>...-> module headers + lines containing any word
+"""
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+for _stream in (sys.stdout, sys.stderr):        # Windows consoles default to a legacy code page
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
+NS = {"m": "http://maven.apache.org/POM/4.0.0"}
+IGNORED_BUILD_DIRS = re.compile(r"(^|/)(target|build)/")
+
+
+def run(cmd):
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+                              encoding="utf-8", errors="replace")
+        return proc.returncode, proc.stdout.strip()
+    except OSError:
+        return 127, ""
+
+
+def junit(dirs):
+    totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+    failed = []
+    for base in dirs:
+        for path in glob.glob(os.path.join(base, "**", "TEST-*.xml"), recursive=True):
+            try:
+                suite = ET.parse(path).getroot()
+            except ET.ParseError:
+                continue
+            for key in totals:
+                totals[key] += int(suite.get(key, 0) or 0)
+            for case in suite.iter("testcase"):
+                if case.find("failure") is not None or case.find("error") is not None:
+                    failed.append("%s#%s" % (case.get("classname"), case.get("name")))
+    totals["failed_tests"] = failed[:50]
+    print(json.dumps(totals))
+
+
+def _text(el, tag):
+    found = el.find("m:" + tag, NS)
+    return found.text.strip() if found is not None and found.text else ""
+
+
+def _pom(path):
+    return ET.parse(path).getroot()
+
+
+def pom_declared(pom):
+    root = _pom(pom)
+    label = pom.replace("\\", "/")
+    parent = root.find("m:parent", NS)
+    if parent is not None:
+        print("%s\tparent\t%s:%s:%s" % (label, _text(parent, "groupId"), _text(parent, "artifactId"), _text(parent, "version")))
+    for section, xpath in (("managed", "m:dependencyManagement/m:dependencies/m:dependency"),
+                           ("dependency", "m:dependencies/m:dependency"),
+                           ("plugin", "m:build/m:plugins/m:plugin")):
+        for dep in root.findall(xpath, NS):
+            scope = _text(dep, "scope")
+            print("%s\t%s\t%s:%s:%s%s" % (label, section, _text(dep, "groupId"), _text(dep, "artifactId"),
+                                          _text(dep, "version") or "(managed)", " scope=" + scope if scope else ""))
+
+
+def version_props(pom):
+    props = _pom(pom).find("m:properties", NS)
+    for el in (props if props is not None else []):
+        tag = el.tag.split("}", 1)[-1]
+        if tag.endswith(".version"):
+            print("%s: <%s>%s</%s>" % (pom.replace("\\", "/"), tag, (el.text or "").strip(), tag))
+
+
+def project_java(pom):
+    props = _pom(pom).find("m:properties", NS)
+    found = props.find("m:java.version", NS) if props is not None else None
+    print(found.text.strip() if found is not None and found.text else "")
+
+
+def _git_changes():
+    code, out = run(["git", "status", "--porcelain", "--untracked-files=all"])
+    return sorted(line[3:].strip().strip('"') for line in out.splitlines() if code == 0 and line.strip())
+
+
+def git_snapshot(path):
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(_git_changes(), fh)
+
+
+def left_in_repo(path):
+    with open(path, encoding="utf-8") as fh:
+        before = set(json.load(fh))
+    print(json.dumps([p for p in _git_changes() if p not in before][:50]))
+
+
+def _env():
+    _, branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    _, commit = run(["git", "rev-parse", "--short", "HEAD"])
+    _, java = run(["java", "-version"])
+    return {"branch": branch, "commit": commit, "java": java.splitlines()[0] if java else ""}
+
+
+def env_info():
+    print(json.dumps(_env()))
+
+
+def summary(out, args):
+    pairs, add_env = [], False
+    while args:
+        arg = args.pop(0)
+        if arg == "--env":
+            add_env = True
+        elif arg == "--fields":
+            with open(args.pop(0), encoding="utf-8-sig") as fh:
+                pairs += [line.rstrip("\r\n") for line in fh if line.strip()]
+        else:
+            pairs.append(arg)
+    data = {}
+    for pair in pairs:
+        if ":=" in pair:
+            key, value = pair.split(":=", 1)
+            data[key] = json.loads(value)
+        else:
+            key, _, value = pair.partition("=")
+            data[key] = value
+    if add_env:
+        env = _env()
+        keys = list(data)
+        ordered = {}
+        for key in keys:                              # keep branch/commit/java right after "repo"
+            ordered[key] = data[key]
+            if key == "repo":
+                ordered.update(env)
+        data = ordered if "repo" in data else dict(data, **env)
+    with open(out, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2)
+    print(json.dumps(data, indent=2))
+
+
+def first_errors(log, limit=40):
+    pattern = re.compile(r"\[ERROR\]|FAILED|error:|Caused by")
+    with open(log, encoding="utf-8", errors="replace") as fh:
+        hits = ["%d:%s" % (n, line.rstrip()) for n, line in enumerate(fh, 1) if pattern.search(line)]
+    print("\n".join(hits[:int(limit)]))
+
+
+def filter_tree(tree, out, words):
+    with open(tree, encoding="utf-8", errors="replace") as fh, open(out, "w", encoding="utf-8") as dst:
+        for line in fh:
+            if re.match(r"^[A-Za-z]", line) or any(w in line for w in words):
+                dst.write(line)
+
+
+def main(argv):
+    if not argv:
+        sys.exit(__doc__)
+    cmd, args = argv[0], argv[1:]
+    table = {
+        "junit": lambda: junit(args), "pom-declared": lambda: pom_declared(args[0]),
+        "version-props": lambda: version_props(args[0]), "project-java": lambda: project_java(args[0]),
+        "git-snapshot": lambda: git_snapshot(args[0]), "left-in-repo": lambda: left_in_repo(args[0]),
+        "env-info": env_info, "summary": lambda: summary(args[0], args[1:]),
+        "first-errors": lambda: first_errors(*args[:2]), "filter-tree": lambda: filter_tree(args[0], args[1], args[2:]),
+    }
+    if cmd not in table:
+        sys.exit("unknown helper %r\n%s" % (cmd, __doc__))
+    table[cmd]()
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

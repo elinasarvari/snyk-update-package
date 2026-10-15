@@ -22,6 +22,10 @@ import os
 import sys
 from collections import OrderedDict
 
+for _stream in (sys.stdout, sys.stderr):        # Windows consoles default to a legacy code page
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 SEVERITY_ORDER = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
 

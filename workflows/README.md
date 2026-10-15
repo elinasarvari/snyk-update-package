@@ -33,3 +33,11 @@ python3 -I toolkit/scripts/workflows.py list            # all runs, current step
 python3 -I toolkit/scripts/workflows.py resolve 1       # folder of Workflow 1
 python3 -I toolkit/scripts/workflows.py new my-slug --title "..."   # start a run by hand
 ```
+
+Windows (PowerShell):
+
+```powershell
+py -3 -I toolkit\scripts\workflows.py list            # all runs, current step
+py -3 -I toolkit\scripts\workflows.py resolve 1       # folder of Workflow 1
+py -3 -I toolkit\scripts\workflows.py new my-slug --title "..."   # start a run by hand
+```

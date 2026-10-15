@@ -54,6 +54,13 @@ python3 -I toolkit/scripts/repos.py add https://github.com/my-org/orders-service
 python3 -I toolkit/scripts/repos.py add ~/repos/orders-service     # already checked out? its URL is looked up for you
 ```
 
+Windows (PowerShell):
+
+```powershell
+py -3 -I toolkit\scripts\repos.py add https://github.com/my-org/orders-service.git path=api
+py -3 -I toolkit\scripts\repos.py add $HOME\repos\orders-service     # already checked out? its URL is looked up for you
+```
+
 In chat, `/dep-run <git-url>` (or `/dep-run ~/repos/orders-service`) adds it for you as well.
 
 **HTTPS or SSH?** Use whatever already works for you with `git clone`:
@@ -66,6 +73,13 @@ In chat, `/dep-run <git-url>` (or `/dep-run ~/repos/orders-service`) adds it for
 ```bash
 python3 -I toolkit/scripts/repos.py clone                  # every repo in the list
 python3 -I toolkit/scripts/repos.py clone orders-service   # just one
+```
+
+Windows (PowerShell):
+
+```powershell
+py -3 -I toolkit\scripts\repos.py clone                  # every repo in the list
+py -3 -I toolkit\scripts\repos.py clone orders-service   # just one
 ```
 
 Or `/dep-clone` in chat. You rarely need to do this yourself: `/dep-run` clones as its first step.
@@ -96,6 +110,13 @@ python3 -I toolkit/scripts/repos.py --workflow 2 status    # is every clone on d
 python3 -I toolkit/scripts/repos.py --workflow 2 release   # finished: back to main (the branch is kept)
 ```
 
+Windows (PowerShell):
+
+```powershell
+py -3 -I toolkit\scripts\repos.py --workflow 2 status    # is every clone on deps/wf-002?
+py -3 -I toolkit\scripts\repos.py --workflow 2 release   # finished: back to main (the branch is kept)
+```
+
 **One workflow at a time per repo.** Each workflow has its own branch, but a clone can only be on one branch
 at a time. Workflows on *different* repos never get in each other's way.
 
@@ -108,7 +129,7 @@ at a time. Workflows on *different* repos never get in each other's way.
 | See what a workflow changed | `git -C repos/<name> diff main...deps/wf-NNN`, or open `repos/<name>/` in VS Code |
 | Get the latest code | `repos.py clone` (clones on main are fast-forwarded; new workflows always start from the latest main anyway) |
 | Work on only some repos in one workflow | `/dep-run <repo>` scopes the workflow to that repo (`workflows/<id>/repos.txt`) |
-| Stop working on a repo | Delete its line, then `rm -rf repos/<name>` once nothing in it is needed |
+| Stop working on a repo | Delete its line, then `rm -rf repos/<name>` (Windows: `Remove-Item -Recurse -Force repos\<name>`) once nothing in it is needed |
 
 ## What each command does to a clone
 

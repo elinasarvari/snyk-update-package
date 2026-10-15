@@ -39,6 +39,10 @@ import shlex
 import subprocess
 import sys
 
+for _stream in (sys.stdout, sys.stderr):        # Windows consoles default to a legacy code page
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REPOS_DIR = os.path.join(ROOT, "repos")                # clones: repos/<name>/
 DEFAULT_MANIFEST = os.path.join(REPOS_DIR, "repos.txt")
@@ -59,9 +63,22 @@ def resolve_path(source):
     return os.path.normpath(os.path.join(ROOT, os.path.expanduser(source)))
 
 
+def looks_like_path(source):
+    """/x, ~/x, ./x, ../x - and on Windows C:\\x, .\\x, ..\\x, \\\\server\\share. URLs never match."""
+    if "://" in source:
+        return False
+    return (source.startswith(("/", "~", "./", "../", ".\\", "..\\", "\\\\"))
+            or bool(re.match(r"^[A-Za-z]:[\\/]", source)))
+
+
+def rel(path):
+    """A path relative to the project, with / on every OS (for messages and docs)."""
+    return os.path.relpath(path, ROOT).replace(os.sep, "/")
+
+
 def is_working_copy(source):
-    """A path (/ ~ ./ ../) to a normal checkout. Bare repos and file:// are clone sources (URLs)."""
-    if not source.startswith(("/", "~", "./", "../")):
+    """A path to a normal checkout. Bare repos and file:// are clone sources (URLs)."""
+    if not looks_like_path(source):
         return False
     return os.path.exists(os.path.join(resolve_path(source), ".git"))
 
@@ -78,7 +95,10 @@ def parse_manifest(path):
             line = "" if raw.lstrip().startswith("#") else raw.split(" #", 1)[0].strip()
             if not line:
                 continue
-            parts = shlex.split(line)
+            # No backslash escapes: Windows paths (C:\\repos\\x) must survive; quotes still group words.
+            lexer = shlex.shlex(line, posix=True)
+            lexer.whitespace_split, lexer.escape = True, ""
+            parts = list(lexer)
             if len(parts) < 2:
                 sys.exit("%s:%d: need '<name> <git-url>'" % (path, lineno))
             repo = {"name": parts[0], "url": parts[1], "branch": "", "path": "", "smoke": False, "build": ""}
@@ -127,7 +147,7 @@ def is_bare_repo(path):
 
 def to_url(ref):
     """A local checkout -> its origin URL (so it can be cloned); a URL or bare-repo path unchanged."""
-    if ref.startswith(("/", "~", "./", "../")) and not is_working_copy(ref):
+    if looks_like_path(ref) and not is_working_copy(ref):
         path = resolve_path(ref)
         if not os.path.exists(path):
             sys.exit("%s does not exist" % path)
@@ -158,7 +178,7 @@ def cmd_add(args):
         sys.exit("invalid repo name %r - pass a name: repos.py add <url> <name>" % name)
     repos = parse_manifest(args.manifest)
     if any(r["name"] == name for r in repos):
-        sys.exit("%s is already in %s" % (name, os.path.relpath(args.manifest, ROOT)))
+        sys.exit("%s is already in %s" % (name, rel(args.manifest)))
     if any(normalise_url(r["url"]) == normalise_url(url) for r in repos):
         sys.exit("%s is already in the list" % url)
     for opt in args.options:
@@ -166,7 +186,7 @@ def cmd_add(args):
             sys.exit("unknown option %r (use %s)" % (opt, ", ".join(KNOWN_KEYS)))
     with open(args.manifest, "a", encoding="utf-8") as fh:
         fh.write("%s  %s%s\n" % (name, url, "".join("  " + (shlex.quote(o) if " " in o else o) for o in args.options)))
-    print("added %s -> %s (%s)" % (name, os.path.relpath(args.manifest, ROOT), url), file=sys.stderr)
+    print("added %s -> %s (%s)" % (name, rel(args.manifest), url), file=sys.stderr)
 
 
 def cmd_ensure(args):
@@ -178,7 +198,7 @@ def cmd_ensure(args):
     if not looks_like_source:
         known = ", ".join(r["name"] for r in parse_manifest(args.manifest)) or "none"
         sys.exit("%r is not in %s (known: %s). Pass its git URL or a local checkout of it to add it."
-                 % (args.ref, os.path.relpath(args.manifest, ROOT), known))
+                 % (args.ref, rel(args.manifest), known))
     args.url = args.ref
     cmd_add(args)
     print(find_repo(parse_manifest(args.manifest), args.ref)["name"])
@@ -207,7 +227,7 @@ def clone_or_refresh(repo):
                         + [repo["url"], d])
         if code != 0:
             return False, "CLONE FAILED: " + (out.splitlines()[-1] if out else "")
-        return True, "cloned into %s" % os.path.relpath(d, ROOT)
+        return True, "cloned into %s" % rel(d)
     git(["fetch", "--quiet", "--prune"], d)
     if state["dirty"]:
         return True, "kept as is - %d uncommitted file(s) on %s" % (state["dirty"], state["branch"])
@@ -321,7 +341,7 @@ def cmd_status(args):
           + ("   ON %s?" % branch_for(wf_id) if wf_id else ""))
     for repo in select(parse_manifest(args.manifest), args.names):
         s = repo_state(repo)
-        where = os.path.relpath(repo["repo_dir"], ROOT)
+        where = rel(repo["repo_dir"])
         if not s["cloned"]:
             print("%-20s not cloned - run: repos.py%s clone %s  (%s)"
                   % (repo["name"], " --workflow " + args.workflow if wf_id else "", repo["name"], where))

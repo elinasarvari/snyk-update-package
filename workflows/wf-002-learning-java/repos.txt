@@ -1,0 +1,2 @@
+# Repos in scope for wf-002 (lines copied from repos/repos.txt)
+learning-java  https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true

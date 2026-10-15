@@ -8,7 +8,8 @@ workflow id to resume, and/or the user's reply to the last stop (e.g. "approve",
 Run the steps below **in order without asking**, following each step's own file in `toolkit/phases/`.
 Stop **only** at the stop points listed. Each step is tracked with `workflows.py` as described in
 `toolkit/WORKFLOW.md` ("Tracking every run"). `W` below means `python3 -I toolkit/scripts/workflows.py`;
-`R` means `python3 -I toolkit/scripts/repos.py`.
+`R` means `python3 -I toolkit/scripts/repos.py`. On Windows: `py -3 -I toolkit\scripts\workflows.py` / `repos.py`, and
+`.ps1` instead of `.sh` scripts (see "Running the commands on Windows" in `toolkit/WORKFLOW.md`).
 
 ## A. Pick the repo and the run
 

@@ -46,6 +46,25 @@ Scripts (run from the project root, Python with `python3 -I`):
 The manifest for an upgrade is `workflows/<id>/repos.txt` if it exists, else `repos/repos.txt`. Pass it with
 `--manifest` to `repos.py` and `snyk-scan.sh`.
 
+## Running the commands on Windows (PowerShell)
+
+The procedures show macOS/Linux commands. **On Windows, translate every command like this** before running it
+(Copilot's terminal on Windows is PowerShell):
+
+| macOS / Linux | Windows (PowerShell) |
+|---------------|----------------------|
+| `python3 -I toolkit/scripts/<x>.py ...` | `py -3 -I toolkit\scripts\<x>.py ...` |
+| `bash toolkit/scripts/<x>.sh ...` | `powershell -ExecutionPolicy Bypass -File toolkit\scripts\<x>.ps1 ...` (same arguments) |
+| `tests/run.sh` | `powershell -ExecutionPolicy Bypass -File tests\run.ps1` |
+| `export NAME=value` | `$env:NAME = "value"` |
+| `rm -rf <dir>` | `Remove-Item -Recurse -Force <dir>` |
+| `git -C <dir> ...` | the same |
+
+- Every `.sh` script has a `.ps1` twin with **the same arguments, outputs and exit codes**. Both work in Windows
+  PowerShell 5.1 and PowerShell 7. The shared parsing is in `toolkit/scripts/script-helpers.py`.
+- Builds use `mvnw.cmd` / `gradlew.bat` on Windows. The Snyk CLI is `snyk-win.exe` (or `snyk` from npm).
+- Paths may use `\` or `/`. The scripts print project paths with `/` on every OS.
+
 ## Orchestrating (`/dep-upgrade`)
 
 1. **Which upgrade?**
