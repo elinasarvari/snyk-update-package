@@ -18,12 +18,12 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
-          cache: maven
+          # no `cache: maven`: this repo has no pom.xml to key the cache on
       - name: Run test suite
         env:
           RUN_MAVEN_TESTS: "1"
