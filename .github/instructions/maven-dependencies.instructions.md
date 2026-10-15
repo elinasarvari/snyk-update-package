@@ -1,5 +1,5 @@
 ---
-applyTo: "workspace/**/pom.xml"
+applyTo: "repos/**/pom.xml"
 description: "Rules for changing dependency versions in the cloned repos' Maven poms"
 ---
 

@@ -5,7 +5,7 @@ not a planner: you change exactly what the plan says, in the order it says.
 
 ## Inputs (in your prompt)
 
-- `repo` — absolute path to the clone root (`workspace/<name>`); git commands run here
+- `repo` — absolute path to the clone root (`repos/<name>`); git commands run here
 - `build_dir` — absolute path holding the pom / build file; build commands run here
 - `plan` — absolute path to `03-plan.md` (only the steps for this repo apply)
 - `log` — absolute path of the apply log to append to (`04-apply-log.md`)

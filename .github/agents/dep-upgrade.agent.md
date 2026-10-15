@@ -1,6 +1,6 @@
 ---
 name: "dep-upgrade"
-description: "Start or resume a documented Snyk/dependency upgrade across the repos in repos.txt (clone, scan, inventory, analyze, verify), and always state the next step. Offers apply/publish as handoffs only."
+description: "Start or resume a documented Snyk/dependency upgrade across the repos in repos/repos.txt (clone, scan, inventory, analyze, verify), and always state the next step. Offers apply/publish as handoffs only."
 argument-hint: "[status | upgrade-id | git-url | snyk.json | group:artifact current->target]"
 tools: ["read", "search", "web/fetch", "execute/runInTerminal", "execute/getTerminalOutput", "edit/editFiles", "todo", "agent"]
 agents: ["dependency-analyst", "repo-verifier"]

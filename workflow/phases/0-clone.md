@@ -1,6 +1,6 @@
 # Phase 0 — Clone target repos
 
-Get every target repo into `workspace/<name>/` and current. Only clones or fast-forwards. It never
+Get every target repo into `repos/<name>/` and current. Only clones or fast-forwards. It never
 discards, resets or switches branches.
 
 ## Input
@@ -14,7 +14,7 @@ discards, resets or switches branches.
 1. **Add new repos:** for each URL, run
    `python3 -I workflow/scripts/repos.py add <git-url> [name] [path=<subdir>] [smoke=true]`.
    If you don't know `path`, clone first (step 2), find the folder holding `pom.xml`/`build.gradle`,
-   and fix the line in `repos.txt`. If there are several build roots, ask whether to add one entry each.
+   and fix the line in `repos/repos.txt`. If there are several build roots, ask whether to add one entry each.
 2. **Clone / refresh:** `python3 -I workflow/scripts/repos.py clone [names...]`. Per repo it:
    - clones it if missing;
    - fast-forwards it if clean and on its default (or configured) branch;

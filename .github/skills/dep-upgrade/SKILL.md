@@ -1,6 +1,6 @@
 ---
 name: dep-upgrade
-description: Snyk-driven dependency upgrade workflow for the Java/Maven repos cloned in workspace/ - clone, scan every flagged package, inventory current vs target, analyse pom/code/config impact with citations, plan, apply on a branch, verify build/tests/boot, publish PRs. Use for Snyk/CVE fixes, library or Spring Boot upgrades, or "what's the next step" on an upgrade.
+description: Snyk-driven dependency upgrade workflow for the Java/Maven repos cloned in repos/ - clone, scan every flagged package, inventory current vs target, analyse pom/code/config impact with citations, plan, apply on a branch, verify build/tests/boot, publish PRs. Use for Snyk/CVE fixes, library or Spring Boot upgrades, or "what's the next step" on an upgrade.
 ---
 
 # Dependency upgrade workflow

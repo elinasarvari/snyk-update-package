@@ -1,5 +1,10 @@
-workspace/
-# raw build/boot logs are large and machine-specific; summaries and diagnoses are kept
+# Clones of the target repos live in repos/<name>/ and are never committed here.
+# Only the list and its README are tracked.
+repos/*
+!repos/repos.txt
+!repos/README.md
+
+# Raw build/boot logs are large and machine-specific; summaries and diagnoses are kept.
 *.log
 upgrades/_health/
 .DS_Store

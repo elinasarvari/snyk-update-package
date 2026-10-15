@@ -7,14 +7,23 @@ tests everything, and opens the pull requests. You decide at each step.
 Works with **GitHub Copilot** (VS Code, agent mode) and **Claude Code**: same commands, same results.
 
 ```
- repos.txt ──▶ /dep-clone ──▶ /dep-scan ──▶ /dep-inventory ──▶ /dep-analyze ──▶ you approve ──▶ /dep-apply ──▶ /dep-verify ──▶ /dep-publish
- (your list)   clone into     every         current vs         what breaks,     the plan        edit on a      build, test,    commit, push,
-               workspace/     flagged       target, what       where, and                       branch         boot, re-scan   open PRs
-                              package       moves with it      a plan
+ repos/repos.txt ─▶ /dep-clone ─▶ /dep-scan ─▶ /dep-inventory ─▶ /dep-analyze ─▶ you approve ─▶ /dep-apply ─▶ /dep-verify ─▶ /dep-publish
+ your list of       clones into   every        current vs       what breaks,    the plan       edit on a     build, test,   commit, push,
+ repos              repos/<name>/ flagged      target, what     where, and                     branch        boot, re-scan  open PRs
+                                  package      moves with it    a plan
 ```
 
-This repo holds **no application code**. Your repos are cloned into `workspace/` (never committed here).
-What this repo keeps is the **workflow** and the **documentation of every upgrade** in `upgrades/`.
+This project holds **no application code**. Everything about the repos you fix lives in one folder:
+
+```text
+snyk-update-package/
+├── repos/
+│   ├── repos.txt        ← the list of repos to clone (you edit this)
+│   ├── README.md        ← how to add and clone repos
+│   └── <name>/          ← the clones, one per line in repos.txt (git-ignored, never committed here)
+├── upgrades/            ← documentation of every upgrade
+└── workflow/            ← how each step works (scripts, procedures, templates)
+```
 
 ---
 
@@ -31,7 +40,7 @@ brew install gh && gh auth login                            # only needed to ope
 
 You also need Java (the version your repos use), Git, and Python 3.9+ (built into macOS).
 
-**2. List the repos you want to fix** in [`repos.txt`](repos.txt):
+**2. List the repos you want to fix** in [`repos/repos.txt`](repos/repos.txt), one line each:
 
 ```text
 # <name>        <git-url>                                          [options]
@@ -39,16 +48,28 @@ learning-java   https://github.com/elinasarvari/learning-java.git  path=backend 
 orders-service  git@github.com:my-org/orders-service.git           branch=develop
 ```
 
-`path` = the folder that has the `pom.xml` (if not the repo root). `smoke=true` also starts the app
-during verification. Or let the assistant add it: `/dep-clone <git-url>`.
+- `name`: the folder it's cloned into, `repos/<name>/`
+- `git-url`: the same URL you'd use with `git clone`
+- `path`: the sub-folder that has the `pom.xml`, if it isn't at the repo root
+- `smoke=true`: also start the app during verification
 
-**3. Open this folder** in VS Code (Copilot Chat → **Agent** mode) or run `claude` in it.
+**3. Clone them** into `repos/`:
 
-**4. Run the steps.** Each one ends by telling you the **▶ Next step**. In Copilot, the next step is also
+```bash
+python3 -I workflow/scripts/repos.py clone      # clones missing repos, updates the rest
+python3 -I workflow/scripts/repos.py status     # check: branch, commit, local changes
+```
+
+Or run `/dep-clone` in chat (step 5). All the options, private repos, HTTPS vs SSH and what each message
+means are in **[repos/README.md](repos/README.md)**.
+
+**4. Open this folder** in VS Code (Copilot Chat → **Agent** mode) or run `claude` in it.
+
+**5. Run the steps.** Each one ends by telling you the **▶ Next step**. In Copilot, the next step is also
 a button under the reply.
 
 ```text
-/dep-clone                       clone / refresh everything in repos.txt
+/dep-clone                       clone / refresh everything in repos/repos.txt
 /dep-scan                        Snyk scan → every flagged package (or: /dep-scan path/to/snyk.json)
 /dep-inventory <id>              exact versions, what sets them, what moves with them, baseline build
 /dep-analyze <id>                breaking changes in YOUR code with file:line, and a step-by-step plan
@@ -61,7 +82,7 @@ a button under the reply.
 `<id>` is the upgrade folder name, e.g. `2026-10-15-spring-boot-4-1`. `/dep-scan` creates it. Lost? Run
 **`/dep-upgrade status`**.
 
-**5. Read the results** in `upgrades/<id>/`. Start with `STATUS.md`.
+**6. Read the results** in `upgrades/<id>/`. Start with `STATUS.md`.
 
 ---
 
@@ -69,7 +90,7 @@ a button under the reply.
 
 | Command | What it does | Creates (in `upgrades/<id>/`) | Changes your repos? |
 |---------|--------------|-------------------------------|---------------------|
-| `/dep-clone [git-url \| name]` | Adds repos to `repos.txt`, clones missing ones, fast-forwards clean ones. Leaves a clone alone if it has local changes or is on another branch | `STATUS.md` repos table | clones / pulls only |
+| `/dep-clone [git-url \| name]` | Adds repos to `repos/repos.txt`, clones missing ones, fast-forwards clean ones. Leaves a clone alone if it has local changes or is on another branch | `STATUS.md` repos table | clones / pulls only |
 | `/dep-scan [snyk.json]` | Runs Snyk on every clone (or reads your export). Lists **every** flagged package: current version, severity, CVEs, fixed-in version, which dependency brings it in, how to fix it. Groups them into the few changes you actually make | `01-snyk-findings.md`, `snyk/findings.csv` | no |
 | `/dep-inventory <id>` | For the packages in scope: the version each repo really uses, what sets it (parent/BOM/property), everything else that changes with it, coupled libraries (e.g. Camel). Builds each repo as a **baseline** | `02-inventory.md`, `facts/`, `verification/baseline/` | no |
 | `/dep-analyze <id>` | Subagents read the official migration guides and search your code, config and tests. Each finding cites `file:line` and a source. Writes an ordered plan with exact diffs | `03-impact.md`, `analysis/`, `03-plan.md` | no |
@@ -102,8 +123,9 @@ upgrades/2026-10-15-spring-boot-4-1/
 
 | Path | What it is | Edit it? |
 |------|------------|----------|
-| `repos.txt` | The repos to clone and fix | **yes**, this is your list |
-| `workspace/` | Clones of your repos (git-ignored) | no, managed by `/dep-clone` |
+| `repos/repos.txt` | The list of repos to clone and fix | **yes**, this is your list |
+| `repos/README.md` | How to add, clone, refresh and remove repos | — |
+| `repos/<name>/` | The clones (git-ignored, never committed here) | no, managed by `/dep-clone` (do your own git work there as usual) |
 | `upgrades/` | Documentation of each upgrade | generated, review it |
 | `workflow/WORKFLOW.md` | Overview the assistants read first: phases, gates, rules | to change behaviour |
 | `workflow/phases/0-clone.md … 6-publish.md` | Step-by-step procedure for each command | to change behaviour |
@@ -130,7 +152,7 @@ python3 -I workflow/scripts/repos.py clone                          # clone/refr
 python3 -I workflow/scripts/repos.py status                         # branch, dirty, ahead/behind
 bash workflow/scripts/snyk-scan.sh /tmp/snyk                        # scan all clones
 python3 -I workflow/scripts/parse-snyk.py /tmp/snyk/*.json --md findings.md --csv findings.csv
-bash workflow/scripts/verify-repo.sh workspace/learning-java/backend /tmp/verify --smoke
+bash workflow/scripts/verify-repo.sh repos/learning-java/backend /tmp/verify --smoke
 ```
 
 ## Guard rails
@@ -153,6 +175,6 @@ bash workflow/scripts/verify-repo.sh workspace/learning-java/backend /tmp/verify
 | `snyk-scan.sh` exits 127 / 126 | Snyk CLI missing / not logged in (see Quick start), or pass a JSON export to `/dep-scan` |
 | Snyk reports a different version than the inventory | Expected when the scan ran on another branch. See *Discrepancies* in `02-inventory.md` |
 | `/dep-clone` says "kept as is" | That clone has local changes or is on `deps/<id>` (upgrade in progress). That's intentional |
-| `/dep-apply` stops at "dirty repo" | Commit or discard your own changes in `workspace/<repo>` first |
+| `/dep-apply` stops at "dirty repo" | Commit or discard your own changes in `repos/<repo>` first |
 | Build red only when repos build in parallel | Shared `~/.m2` download clash. Re-run that repo: `/dep-verify <id> <repo>` |
 | `/dep-publish` stops | `gh auth status` must pass. For Bitbucket/GitLab it pushes and gives you the PR link instead |

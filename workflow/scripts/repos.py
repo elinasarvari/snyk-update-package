@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Manage the target repositories listed in repos.txt: add, clone/refresh, list, status.
+"""Manage the target repositories listed in repos/repos.txt: add, clone/refresh, list, status.
 
-Clones live in <project>/workspace/<name>/ (git-ignored). The workflow never edits a clone
+Clones live in <project>/repos/<name>/ (git-ignored). The workflow never edits a clone
 except in the apply phase, on a deps/<upgrade-id> branch.
 
-repos.txt - one repo per line, '#' starts a comment:
+repos/repos.txt - one repo per line, '#' starts a comment:
     <name>  <git-url>  [branch=<b>] [path=<subdir>] [smoke=true] [build="<cmd>"]
       branch  branch to clone/refresh (default: the remote's default branch)
       path    sub-folder that holds pom.xml / build.gradle (default: repo root)
@@ -16,7 +16,7 @@ Usage (from the project root):
     python3 -I workflow/scripts/repos.py clone  [name ...]     # clone missing, fast-forward clean ones
     python3 -I workflow/scripts/repos.py list   [name ...] [--json]
     python3 -I workflow/scripts/repos.py status [name ...]
-    Options: --manifest <file>  use another repos.txt (e.g. upgrades/<id>/repos.txt)
+    Options: --manifest <file>  use another list, e.g. upgrades/<id>/repos.txt (same format)
 
 `list` prints TSV: name, build_dir, verify_args, url, branch, clone_dir - for scripts.
 Written for Python 3.9 - stdlib only.
@@ -30,8 +30,10 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-WORKSPACE = os.path.join(ROOT, "workspace")
-DEFAULT_MANIFEST = os.path.join(ROOT, "repos.txt")
+REPOS_DIR = os.path.join(ROOT, "repos")          # clones go to repos/<name>/
+DEFAULT_MANIFEST = os.path.join(REPOS_DIR, "repos.txt")
+# Files kept in repos/ next to the clones - a repo may not use these names.
+RESERVED_NAMES = ("repos.txt", "README.md")
 KNOWN_KEYS = ("branch", "path", "smoke", "build")
 
 
@@ -51,7 +53,10 @@ def parse_manifest(path):
                 if not sep or key not in KNOWN_KEYS:
                     sys.exit("%s:%d: unknown option %r (use %s)" % (path, lineno, opt, ", ".join(KNOWN_KEYS)))
                 repo[key] = value.lower() in ("1", "true", "yes") if key == "smoke" else value
-            repo["clone_dir"] = os.path.join(WORKSPACE, repo["name"])
+            if repo["name"] in RESERVED_NAMES or not re.match(r"^[A-Za-z0-9._-]+$", repo["name"]):
+                sys.exit("%s:%d: invalid repo name %r (letters, digits, . _ - only; not %s)"
+                         % (path, lineno, repo["name"], " or ".join(RESERVED_NAMES)))
+            repo["clone_dir"] = os.path.join(REPOS_DIR, repo["name"])
             repo["build_dir"] = os.path.normpath(os.path.join(repo["clone_dir"], repo["path"]))
             args = (["--smoke"] if repo["smoke"] else []) + (["--build-cmd", repo["build"]] if repo["build"] else [])
             repo["verify_args"] = " ".join(shlex.quote(a) for a in args)
@@ -91,6 +96,8 @@ def repo_state(repo):
 def cmd_add(args):
     url = args.url
     name = args.name or re.sub(r"\.git$", "", url.rstrip("/").split("/")[-1].split(":")[-1])
+    if name in RESERVED_NAMES or not re.match(r"^[A-Za-z0-9._-]+$", name):
+        sys.exit("invalid repo name %r - pass a name: repos.py add <url> <name>" % name)
     if any(r["name"] == name for r in parse_manifest(args.manifest)):
         sys.exit("%s is already in %s" % (name, args.manifest))
     for opt in args.options:
@@ -103,7 +110,7 @@ def cmd_add(args):
 
 
 def cmd_clone(args):
-    os.makedirs(WORKSPACE, exist_ok=True)
+    os.makedirs(REPOS_DIR, exist_ok=True)
     failed = 0
     for repo in select(parse_manifest(args.manifest), args.names):
         d, state = repo["clone_dir"], repo_state(repo)

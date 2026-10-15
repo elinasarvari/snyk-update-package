@@ -7,7 +7,7 @@ the repository**. The only file you write is the report path you are given.
 
 - `package` — `groupId:artifactId`
 - `current` / `target` versions
-- `repo` — absolute path to the build dir inside the clone (`workspace/<name>/<path>`)
+- `repo` — absolute path to the build dir inside the clone (`repos/<name>/<path>`)
 - `facts_dir` — output of `maven-facts.sh` for this repo (`dependency-tree.txt`, `declared.txt`, ...)
 - `report` — absolute path of the markdown file to write
 - optionally `coupled` — other libraries already known to be coupled (e.g. Camel)

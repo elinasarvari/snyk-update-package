@@ -15,12 +15,12 @@ Target exists on Maven Central: ✅ `spring-boot-starter-parent` 4.1.1 is the la
 
 | # | Package | Repo | Declared where | How version is set | Resolved now | Target | Lever to change it |
 |---|---------|------|----------------|--------------------|--------------|--------|--------------------|
-| 1 | `spring-boot-starter-web` | learning-java (`path=backend`) | `workspace/learning-java/backend/pom.xml:44-46` | managed by parent `spring-boot-starter-parent` | **3.3.2** | 4.1.1 | `<parent><version>` at `workspace/learning-java/backend/pom.xml:11` |
+| 1 | `spring-boot-starter-web` | learning-java (`path=backend`) | `repos/learning-java/backend/pom.xml:44-46` | managed by parent `spring-boot-starter-parent` | **3.3.2** | 4.1.1 | `<parent><version>` at `repos/learning-java/backend/pom.xml:11` |
 
 ### Discrepancies
 
 - **Reported 3.5.16, resolved 3.3.2.** `main` @ `5f3f485` declares parent `3.3.2`
-  (`workspace/learning-java/backend/pom.xml:11`), and `dependency:tree` confirms every Boot artifact at 3.3.2. The
+  (`repos/learning-java/backend/pom.xml:11`), and `dependency:tree` confirms every Boot artifact at 3.3.2. The
   Snyk scan was probably run on another branch or another repo. Note that 3.5.16 is also
   the Boot version Camel 4.18.5 is built against (see below), so a dependency report that
   includes Camel's own BOM can show it. **Decision needed:** confirm the scan's source
@@ -54,7 +54,7 @@ The 3.5.16 column shows the stepping-stone option.
 
 | Package | Now | Compatible with 4.1.1? | Required version | Evidence |
 |---------|-----|------------------------|------------------|----------|
-| Camel (`camel-spring-boot-bom`, `${camel.version}` at `workspace/learning-java/backend/pom.xml:26`) | 4.8.5 (built for Boot 3.3) | ❌ | **4.22.1** or **4.23.0** (both built against Boot 4.1.1) | `<spring-boot-version>` in `org.apache.camel:camel-parent` poms on Maven Central: 4.18.5→3.5.16, 4.19/4.20→4.0.5, 4.21.0→4.1.0, 4.22.1→4.1.1, 4.23.0→4.1.1. The pom comment at `workspace/learning-java/backend/pom.xml:23-25` warns that a mismatch fails at startup. LTS status of 4.22 vs 4.23 is still `check` (phase 3). |
+| Camel (`camel-spring-boot-bom`, `${camel.version}` at `repos/learning-java/backend/pom.xml:26`) | 4.8.5 (built for Boot 3.3) | ❌ | **4.22.1** or **4.23.0** (both built against Boot 4.1.1) | `<spring-boot-version>` in `org.apache.camel:camel-parent` poms on Maven Central: 4.18.5→3.5.16, 4.19/4.20→4.0.5, 4.21.0→4.1.0, 4.22.1→4.1.1, 4.23.0→4.1.1. The pom comment at `repos/learning-java/backend/pom.xml:23-25` warns that a mismatch fails at startup. LTS status of 4.22 vs 4.23 is still `check` (phase 3). |
 | Java baseline | 21 | ✅ (Boot 4 requires 17+) | 21 | — |
 | Maven wrapper | 3.9.16 | ✅ | — | `.mvn/wrapper/maven-wrapper.properties` |
 

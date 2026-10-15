@@ -14,7 +14,7 @@
 
 1. Create `04-apply-log.md` from the template. STATUS phase 4 → 🟡.
 2. **Delegate each repo to the `upgrade-applier` subagent** (role: `workflow/roles/upgrade-applier.md`).
-   Pass `repo` (= the clone root `workspace/<name>`), `build_dir`, `plan`, `log` (all absolute) and
+   Pass `repo` (= the clone root `repos/<name>`), `build_dir`, `plan`, `log` (all absolute) and
    `branch = deps/<upgrade-id>`. Run them in parallel when possible. If the user named repos, do only those.
 3. **Collect** the results into `04-apply-log.md`, one section per repo: steps ✅/⛔, deviations, final
    `git diff --stat`. Repeat every deviation from the plan at the top.

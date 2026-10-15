@@ -1,13 +1,13 @@
 # Snyk package-update workflow — overview for agents
 
 This project is a **meta repository**. It holds no application code. It clones the target repos
-listed in `repos.txt` into `workspace/`, then scans, documents, upgrades, verifies and publishes
+listed in `repos/repos.txt` into `repos/`, then scans, documents, upgrades, verifies and publishes
 them. Every tool entry point (`.github/` for Copilot, `.claude/` for Claude Code) reads this file
 and the phase file it's running. **This folder is the single source of truth.**
 
 ```
 /dep-clone ─▶ /dep-scan ─▶ /dep-inventory ─▶ /dep-analyze ─▶ ⏸ approve ─▶ /dep-apply ─▶ /dep-verify ─▶ /dep-publish
- workspace/    01-snyk-      02-inventory     03-impact       03-plan      04-apply-log   05-verification  06-publish
+ repos/    01-snyk-      02-inventory     03-impact       03-plan      04-apply-log   05-verification  06-publish
  clones        findings                       03-plan                      (deps/<id>)                     (commit+PR)
 ```
 
@@ -26,8 +26,8 @@ and the phase file it's running. **This folder is the single source of truth.**
 
 | Path | What |
 |------|------|
-| `repos.txt` | Target repos: `<name> <git-url> [branch=] [path=] [smoke=true] [build="..."]` |
-| `workspace/<name>/` | The clone (git-ignored). Build dir = `workspace/<name>/<path>` |
+| `repos/repos.txt` | Target repos: `<name> <git-url> [branch=] [path=] [smoke=true] [build="..."]` |
+| `repos/<name>/` | The clone (git-ignored). Build dir = `repos/<name>/<path>` |
 | `upgrades/<YYYY-MM-DD>-<slug>/` | One folder per upgrade: `STATUS.md` + the numbered docs + raw data |
 | `upgrades/<id>/repos.txt` | Optional: limit this upgrade to some repos (same format) |
 | `workflow/phases/`, `roles/`, `templates/`, `scripts/` | Procedures, subagent definitions, doc templates, tools |
@@ -42,7 +42,7 @@ Scripts (run from the project root, Python with `python3 -I`):
 | `workflow/scripts/maven-facts.sh <build_dir> <out> [filters]` | Parent, declared deps, version properties, resolved tree |
 | `workflow/scripts/verify-repo.sh <build_dir> <out> [--smoke] [--build-cmd]` | Build → JUnit counts → smoke boot → `summary.json` |
 
-The manifest for an upgrade is `upgrades/<id>/repos.txt` if it exists, else `repos.txt`. Pass it with
+The manifest for an upgrade is `upgrades/<id>/repos.txt` if it exists, else `repos/repos.txt`. Pass it with
 `--manifest` to `repos.py` and `snyk-scan.sh`.
 
 ## Orchestrating (`/dep-upgrade`)
@@ -69,7 +69,7 @@ The manifest for an upgrade is `upgrades/<id>/repos.txt` if it exists, else `rep
 - **Upgrade the lever, not the leaf.** Starters, Spring Framework, Jackson, Hibernate, Tomcat and Netty are
   managed by the Boot parent/BOM. Bump the parent; never pin one managed artifact across a major line.
 - **Majors are stepped.** Read every intermediate line's migration guide (3.3 → 3.4 → 3.5 → 4.0 → 4.1).
-- **Documentation is the product.** Each claim cites `workspace/<repo>/path:line` or a URL.
+- **Documentation is the product.** Each claim cites `repos/<repo>/path:line` or a URL.
   "Checked, not affected" lists are required.
 - **Never hide red.** No skipping tests, `@Disabled`, or `-DskipTests` to get green.
 - **Never touch the user's work.** A clone with uncommitted changes or on an unexpected branch is

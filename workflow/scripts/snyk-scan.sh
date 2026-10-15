@@ -3,7 +3,7 @@
 # Read-only for the repos (Snyk resolves the Maven/Gradle tree; it does not edit files).
 #
 # Usage (from the project root):
-#   workflow/scripts/snyk-scan.sh <out-dir> [--manifest <repos.txt>] [extra snyk args...]
+#   workflow/scripts/snyk-scan.sh <out-dir> [--manifest <list-file>] [extra snyk args...]
 #   e.g. workflow/scripts/snyk-scan.sh upgrades/2026-10-15-x/snyk --org=my-org
 #
 # Needs the Snyk CLI, authenticated:

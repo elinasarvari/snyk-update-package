@@ -27,7 +27,7 @@ States: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked · ⏸ aw
 
 ## Repos
 
-| Repo | Clone (`workspace/…`) | Start commit | Baseline (before) | After upgrade | PR |
+| Repo | Clone (`repos/…`) | Start commit | Baseline (before) | After upgrade | PR |
 |------|-----------------------|--------------|-------------------|---------------|----|
 
 ## Decisions and open questions

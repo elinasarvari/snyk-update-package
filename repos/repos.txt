@@ -1,0 +1,14 @@
+# The repositories to clone, scan, upgrade and verify. One per line. How-to: repos/README.md
+#
+#   <name>  <git-url>  [branch=<b>] [path=<subdir>] [smoke=true] [build="<cmd>"]
+#
+#   name    folder it is cloned into: repos/<name>/   (letters, digits, . _ - only)
+#   git-url the same URL you would give `git clone` (HTTPS or SSH)
+#   branch  branch to clone and keep up to date      (default: the repo's default branch)
+#   path    sub-folder that holds pom.xml / build.gradle  (default: the repo root)
+#   smoke   also start the app during verification and wait for "Started ... in"
+#   build   your own build command                   (default: ./mvnw -B clean verify  or  ./gradlew clean build)
+#
+# Then clone everything with:   python3 -I workflow/scripts/repos.py clone     (or /dep-clone in chat)
+
+learning-java  https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true

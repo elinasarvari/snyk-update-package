@@ -12,7 +12,7 @@
 
 ## Steps (per repo)
 
-1. In `workspace/<name>` on `deps/<id>`, review `git status`. Stage **only** the files listed in
+1. In `repos/<name>` on `deps/<id>`, review `git status`. Stage **only** the files listed in
    `04-apply-log.md`; never `target/`, `build/`, or stray files.
 2. **Commit:** `deps: <one-line summary>` (e.g. `deps: Spring Boot 3.3.2 -> 4.1.1, Camel 4.8.5 -> 4.22.1`).
    In the body, list the Snyk issue ids/CVEs fixed and the meta-repo upgrade id.

@@ -5,7 +5,7 @@
 | **Upgrade id** | `2026-10-15-spring-boot-4-1` |
 | **Source** | manual request: `spring-boot-starter-web` 3.5.16 → 4.1.1 (from Snyk; report not attached yet) |
 | **Started** | 2026-10-15 (moved here from `learning-java/docs/upgrades/`) |
-| **Repos in scope** | all of `repos.txt` — see [repos](#repos) |
+| **Repos in scope** | all of `repos/repos.txt` — see [repos](#repos) |
 
 ## Phase tracker
 
@@ -30,7 +30,7 @@ or `/dep-scan 2026-10-15-spring-boot-4-1 <snyk.json>` with an export. Then choos
 
 ## Repos
 
-| Repo | Clone (`workspace/…`) | Start commit | Baseline (before) | After upgrade | PR |
+| Repo | Clone (`repos/…`) | Start commit | Baseline (before) | After upgrade | PR |
 |------|-----------------------|--------------|-------------------|---------------|----|
 | learning-java | `learning-java/backend` | `main` @ `5f3f485` | ✅ green — 39/0/0/0, boots ([summary](verification/baseline/learning-java/summary.json)) | | |
 

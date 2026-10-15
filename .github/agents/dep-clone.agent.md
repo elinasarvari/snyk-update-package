@@ -1,6 +1,6 @@
 ---
 name: "dep-clone"
-description: "Phase 0 - add target repos to repos.txt and clone/refresh them into workspace/ (never resets or switches branches)."
+description: "Phase 0 - add target repos to repos/repos.txt and clone/refresh them into repos/ (never resets or switches branches)."
 argument-hint: "[git-url [name] [path=<subdir>] [smoke=true] | repo-name ... | (empty = all)]"
 tools: ["read", "search", "web/fetch", "execute/runInTerminal", "execute/getTerminalOutput", "edit/editFiles", "todo"]
 handoffs:

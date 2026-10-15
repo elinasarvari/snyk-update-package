@@ -27,7 +27,7 @@ Build, test and boot every target repo. Also usable on its own as a health check
    pre-existing / environmental / unknown), and the Verdict.
 7. STATUS phase 5 → ✅ if every repo is green, or only pre-existing/environmental failures remain
    (say which). Otherwise ⛔.
-   - ▶ Next step when green: "review the diff (`git -C workspace/<name> diff`), then `/dep-publish <id>`".
+   - ▶ Next step when green: "review the diff (`git -C repos/<name> diff`), then `/dep-publish <id>`".
    - ▶ Next step when red: the fix for each regression. Add it as new plan steps (needs
      re-approval), then `/dep-apply` → `/dep-verify` again.
 8. Never re-run with tests skipped to manufacture a green result.

@@ -15,13 +15,13 @@ RO = ["read", "search", "web/fetch", "execute/runInTerminal", "execute/getTermin
 PHASES = [
     # name, phase file, description, argument hint, subagents, manual-only, handoffs [(label, agent, prompt)]
     ("dep-upgrade", None,
-     "Start or resume a documented Snyk/dependency upgrade across the repos in repos.txt (clone, scan, inventory, analyze, verify), and always state the next step. Offers apply/publish as handoffs only.",
+     "Start or resume a documented Snyk/dependency upgrade across the repos in repos/repos.txt (clone, scan, inventory, analyze, verify), and always state the next step. Offers apply/publish as handoffs only.",
      "[status | upgrade-id | git-url | snyk.json | group:artifact current->target]",
      ["dependency-analyst", "repo-verifier"], False,
      [("Apply the approved plan", "dep-apply", "I have reviewed 03-plan.md for this upgrade and approve it as written. Record my approval and apply it."),
       ("Verify all repos", "dep-verify", "Verify all repos for this upgrade.")]),
     ("dep-clone", "0-clone.md",
-     "Phase 0 - add target repos to repos.txt and clone/refresh them into workspace/ (never resets or switches branches).",
+     "Phase 0 - add target repos to repos/repos.txt and clone/refresh them into repos/ (never resets or switches branches).",
      "[git-url [name] [path=<subdir>] [smoke=true] | repo-name ... | (empty = all)]", [], False,
      [("Next: Snyk scan", "dep-scan", "Run the Snyk scan over all cloned repos.")]),
     ("dep-scan", "1-scan.md",

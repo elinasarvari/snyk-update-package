@@ -29,7 +29,7 @@ Each step is small enough to build and test on its own. `/dep-apply` stops at th
 
 ## Rollback
 
-Each cloned repo (`workspace/<repo>`) is changed on branch `deps/{{UPGRADE_ID}}`. Rollback = `git switch <original branch>`;
+Each cloned repo (`repos/<repo>`) is changed on branch `deps/{{UPGRADE_ID}}`. Rollback = `git switch <original branch>`;
 the branch is left for inspection, never force-deleted by the tooling.
 
 ## Out of scope / follow-ups
