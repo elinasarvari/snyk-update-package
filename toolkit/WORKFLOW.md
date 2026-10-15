@@ -1,7 +1,7 @@
 # Snyk package-update workflow — overview for agents
 
 This project is a **meta repository**. It holds no application code. It works on the target repos
-listed in `repos/repos.txt` (your own local folders, or git URLs it clones into `repos/`), then scans, documents, upgrades, verifies and publishes
+listed in `repos/repos.txt`, cloned into `repos/<name>/`, then scans, documents, upgrades, verifies and publishes
 them. Every tool entry point (`.github/` for Copilot, `.claude/` for Claude Code) reads this file
 and the phase file it's running. **This folder is the single source of truth.**
 
@@ -13,7 +13,7 @@ and the phase file it's running. **This folder is the single source of truth.**
 
 | # | Command | Procedure | Subagent (role) | Writes to target repos? |
 |---|---------|-----------|-----------------|-------------------------|
-| 0 | `/dep-clone` | [phases/0-clone.md](phases/0-clone.md) | — | URLs: clone / fast-forward. Local folders: check only |
+| 0 | `/dep-clone` | [phases/0-clone.md](phases/0-clone.md) | — | clones into `repos/<name>/`; in a workflow, puts the clone on `deps/<id>` from the latest main |
 | 1 | `/dep-scan` | [phases/1-scan.md](phases/1-scan.md) | — | no |
 | 2 | `/dep-inventory` | [phases/2-inventory.md](phases/2-inventory.md) | — | no (build output only) |
 | 3 | `/dep-analyze` | [phases/3-analyze.md](phases/3-analyze.md) | `dependency-analyst` × (lever, repo) | no |
@@ -27,8 +27,8 @@ and the phase file it's running. **This folder is the single source of truth.**
 
 | Path | What |
 |------|------|
-| `repos/repos.txt` | Target repos, each a local folder or a git URL: `<name> <git-url> [branch=] [path=] [smoke=true] [build="..."]` |
-| repo folder (`repo_dir`) | Where a repo's code is: the **local folder** from the list (used in place), or `repos/<name>/` for a git URL (git-ignored). Build dir = `<repo_dir>/<path>` |
+| `repos/repos.txt` | Target repos, by git URL: `<name> <git-url> [branch=] [path=] [smoke=true] [build="..."]` |
+| `repos/<name>/` (`repo_dir`) | The repo's clone (git-ignored). **All code changes happen here**, on the workflow's branch `deps/<id>`. Build dir = `<repo_dir>/<path>`. The user's own checkouts elsewhere are never touched |
 | `workflows/wf-<NNN>-<slug>/` | One folder per upgrade: `STATUS.md` + the numbered docs + raw data |
 | `workflows/<id>/repos.txt` | Optional: limit this upgrade to some repos (same format) |
 | `toolkit/phases/`, `roles/`, `templates/`, `scripts/` | Procedures, subagent definitions, doc templates, tools |
@@ -37,7 +37,7 @@ Scripts (run from the project root, Python with `python3 -I`):
 
 | Script | Purpose |
 |--------|---------|
-| `toolkit/scripts/repos.py add\|clone\|list\|status` | Manage target repos. `list` gives `name, build_dir, verify_args, url, branch, repo_dir, kind` as TSV |
+| `toolkit/scripts/repos.py add\|ensure\|clone\|list\|status\|release` | Manage target repos. `--workflow <id> clone` puts each clone on `deps/<id>`. `list` gives `name, build_dir, verify_args, url, base_branch, repo_dir` as TSV |
 | `toolkit/scripts/snyk-scan.sh <out> [--manifest f] [snyk args]` | `snyk test --all-projects --json` for every repo folder |
 | `toolkit/scripts/parse-snyk.py <json…> --md --csv --json` | Every flagged package + changes grouped by the dependency you edit |
 | `toolkit/scripts/maven-facts.sh <build_dir> <out> [filters]` | Parent, declared deps, version properties, resolved tree |
@@ -50,7 +50,7 @@ The manifest for an upgrade is `workflows/<id>/repos.txt` if it exists, else `re
 
 1. **Which upgrade?**
    - `status` or an existing workflow id → resume it.
-   - a git URL or a local folder → run phase 0 to add it, then continue as a new upgrade.
+   - a git URL, or a local checkout (used only to find its URL) → run phase 0 to add it, then continue as a new upgrade.
    - a Snyk JSON path, pasted Snyk output, or "scan" → new upgrade starting at phase 1.
    - `group:artifact X->Y` pairs → new upgrade starting at phase 2 (phase 1 = "skipped — manual").
    - no argument → show `workflows.py list` and `repos.py status`, then ask which.
@@ -92,8 +92,15 @@ Each of these appends a timestamped line to the run's **History** and rebuilds `
 - **Documentation is the product.** Each claim cites `repos/<repo>/path:line` or a URL.
   "Checked, not affected" lists are required.
 - **Never hide red.** No skipping tests, `@Disabled`, or `-DskipTests` to get green.
-- **Never touch the user's work.** A repo folder with uncommitted changes or on an unexpected branch is
-  reported, never reset, stashed, pulled or switched. Local folders are the user's own checkout: say so
-  whenever a phase is about to create or switch to a `deps/<id>` branch there.
+- **The clone holds code changes only. Everything else lives in this project.** In `repos/<name>/` the
+  workflow may only change what the approved plan says (code, `pom.xml`/build files, config, tests). It
+  never writes documentation, reports, logs, notes, Snyk policy files (`.snyk`), helper scripts or anything
+  else there. All of that goes to `workflows/<id>/`. Builds may create the repo's normal build output
+  (`target/`, `build/`); `verify-repo.sh` reports anything else a build leaves behind (`left_in_repo`).
+- **Never touch the user's work.** All changes happen in the clones under `repos/`, never in the user's own
+  checkouts. A clone with uncommitted changes (e.g. another workflow's unpublished work) is reported, never
+  reset, stashed or switched.
+- **One branch per workflow, one workflow at a time per clone.** Workflow `wf-NNN` works on `deps/wf-NNN`, created
+  from the latest main by `repos.py --workflow <id> clone`. Never create or name the branch any other way.
 - **Nothing leaves the machine without the user asking.** Commits, pushes and PRs in target repos
   happen only in `/dep-publish`. This meta repo's own docs are committed only when the user asks.

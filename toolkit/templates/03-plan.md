@@ -29,7 +29,7 @@ Each step is small enough to build and test on its own. `/dep-apply` stops at th
 
 ## Rollback
 
-Each repo folder (your local folder, or `repos/<name>` for URL repos) is changed on branch `deps/{{WORKFLOW_ID}}`. Rollback = `git switch <original branch>`;
+Each clone `repos/<name>/` is changed on branch `deps/{{WORKFLOW_ID}}`, created from the latest main. Rollback = `repos.py --workflow {{WORKFLOW_ID}} release` (back to main);
 the branch is left for inspection, never force-deleted by the tooling.
 
 ## Out of scope / follow-ups

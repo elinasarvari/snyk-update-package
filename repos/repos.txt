@@ -1,21 +1,19 @@
-# The repositories to scan, upgrade and verify. One per line. How-to: repos/README.md
+# The repositories to fix. One per line. How-to: repos/README.md
 #
-#   <name>  <where>  [branch=<b>] [path=<subdir>] [smoke=true] [build="<cmd>"]
+#   <name>  <git-url>  [branch=<b>] [path=<subdir>] [smoke=true] [build="<cmd>"]
 #
-#   name    short name used in commands (letters, digits, . _ - only)
-#   where   EITHER a local folder you already have   →  used in place, never cloned or pulled
-#               ~/repos/learning-java     /abs/path/repo     ../my-repo      (must start with / ~ ./ ../)
-#           OR a git URL                             →  cloned into repos/<name>/ (git-ignored)
-#               https://github.com/org/repo.git      git@github.com:org/repo.git
-#   branch  URL: branch to clone and keep updated.  Local folder: the branch you expect it on (only checked)
+#   name    folder it's cloned into: repos/<name>/   (letters, digits, . _ - only)
+#   git-url the URL you'd give `git clone` (HTTPS or SSH)
+#   branch  the repo's main branch, if it isn't called `main`
 #   path    sub-folder that holds pom.xml / build.gradle  (default: the repo root)
 #   smoke   also start the app during verification and wait for "Started ... in"
 #   build   your own build command  (default: ./mvnw -B clean verify  or  ./gradlew clean build)
 #
-# Local folders are machine-specific: if you share this list, others must change them to their own paths
-# (or use the git URL instead).
+# Every repo is cloned into repos/<name>/ and the changes happen there, on branch deps/wf-NNN
+# (one branch per workflow, from the latest main). Your own checkouts elsewhere are never touched.
+# Have it checked out already? `repos.py add ~/path/to/it` finds its URL for you.
 #
-# Then check / clone everything with:   python3 -I toolkit/scripts/repos.py clone     (or /dep-clone in chat)
+# Then:  python3 -I toolkit/scripts/repos.py clone        (or /dep-clone, or just /dep-run <name>)
 
-learning-java  ~/repos/learning-java  branch=main  path=backend  smoke=true
-# orders-service  https://github.com/my-org/orders-service.git  branch=develop
+learning-java  https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true
+# orders-service  git@github.com:my-org/orders-service.git  branch=develop

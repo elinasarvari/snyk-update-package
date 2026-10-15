@@ -20,18 +20,19 @@ class VerifyRepo(Sandbox):
         path = os.path.join(self.tmp, "svc")
         os.makedirs(path)
         self.write(os.path.join(path, "pom.xml"), "<project/>\n")
+        self.write(os.path.join(path, ".gitignore"), "target/\n")       # like any real Maven repo
         self.git(path, "init", "-q", "-b", "main")
         self.git(path, "add", "-A")
         self.git(path, "commit", "-q", "-m", "initial")
         return path
 
-    def fake_build(self, tests=3, failures=0, skipped=0, exit_code=0):
+    def fake_build(self, tests=3, failures=0, skipped=0, exit_code=0, extra=""):
         failure = '<testcase classname="com.example.Broken" name="fails"><failure message="boom"/></testcase>' if failures else ""
         xml = SUREFIRE.format(name="AppTest", tests=tests, failures=failures, skipped=skipped, failure=failure)
         script = self.write(os.path.join(self.tmp, "build.sh"), "\n".join([
             "mkdir -p target/surefire-reports",
             "cat > target/surefire-reports/TEST-AppTest.xml <<'XML'", xml, "XML",
-            "echo '[INFO] fake build'", "%s" % ("echo '[ERROR] Tests failed' && exit %d" % exit_code if exit_code else "exit 0"), ""]))
+            "echo '[INFO] fake build'", extra, "%s" % ("echo '[ERROR] Tests failed' && exit %d" % exit_code if exit_code else "exit 0"), ""]))
         return "bash " + script
 
     def verify(self, repo, *args):
@@ -56,6 +57,22 @@ class VerifyRepo(Sandbox):
         self.assertEqual(summary["tests"]["failures"], 1)
         self.assertEqual(summary["tests"]["failed_tests"], ["com.example.Broken#fails"])
         self.assertIn("[ERROR] Tests failed", proc.stdout, "prints the first errors from the log")
+
+    def test_a_clean_build_leaves_nothing_in_the_repo(self):
+        repo = self.repo()
+        proc, summary = self.verify(repo, "--build-cmd", self.fake_build())
+        self.assertEqual(summary["left_in_repo"], [])
+        self.assertEqual(self.git(repo, "status", "--porcelain", "--untracked-files=all"), "")
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp, "verify", "build.log")), "logs go to the out dir")
+        self.assertFalse(os.path.exists(os.path.join(repo, "build.log")))
+
+    def test_files_a_build_leaves_outside_target_are_reported_not_deleted(self):
+        repo = self.repo()
+        proc, summary = self.verify(repo, "--build-cmd", self.fake_build(extra="echo x > generated-report.txt"))
+        self.assertEqual(proc.returncode, 0, "a warning, not a failure")
+        self.assertEqual(summary["left_in_repo"], ["generated-report.txt"])
+        self.assertIn("WARNING: the build left files in the repo", proc.stdout)
+        self.assertTrue(os.path.exists(os.path.join(repo, "generated-report.txt")), "never deletes anything")
 
     def test_folder_without_build_file_is_unsupported(self):
         empty = os.path.join(self.tmp, "empty")
@@ -90,6 +107,17 @@ class VerifyRepo(Sandbox):
         self.assertEqual(proc.returncode, 0, proc.stdout)
         self.assertEqual(summary["smoke"], "started")
         self.assertIn("Started App in", open(os.path.join(self.tmp, "verify", "smoke.log")).read())
+
+    @unittest.skipUnless(HAVE_JDK, "needs javac and jar")
+    def test_files_the_app_writes_while_booting_land_in_the_out_dir_not_the_repo(self):
+        repo = self.repo()
+        self.jar(repo, 'java.nio.file.Files.write(java.nio.file.Paths.get("app.log"), "hello".getBytes()); '
+                       'System.out.println("Started App in 0.5 seconds"); Thread.sleep(60000);')
+        proc, summary = self.verify(repo, "--smoke", "--build-cmd", self.fake_build())
+        self.assertEqual(summary["smoke"], "started", proc.stdout)
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp, "verify", "app.log")))
+        self.assertFalse(os.path.exists(os.path.join(repo, "app.log")))
+        self.assertEqual(summary["left_in_repo"], [])
 
     @unittest.skipUnless(HAVE_JDK, "needs javac and jar")
     def test_smoke_boot_failure_is_red_even_when_tests_pass(self):

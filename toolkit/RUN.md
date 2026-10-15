@@ -1,6 +1,7 @@
 # /dep-run: run the whole workflow for one repo, stop only where the user is needed
 
-Input: **one repo**, as its name in `repos/repos.txt`, a local folder, or a git URL. Optionally also a
+Input: **one repo**, as its name in `repos/repos.txt`, its git URL, or a local checkout of it (only used to
+find the URL; the work always happens in the clone under `repos/`). Optionally also a
 workflow id to resume, and/or the user's reply to the last stop (e.g. "approve", "scope: high+",
 "proceed from 3.3.2").
 
@@ -29,7 +30,7 @@ Stop **only** at the stop points listed. Each step is tracked with `workflows.py
 
 | Step | Do | Continue automatically when | **STOP** (set ▶ Next step, then end the run) when |
 |------|----|-----------------------------|---------------------------------------------------|
-| 0 Clone | `phases/0-clone.md` | the repo folder exists | the folder is missing, the clone failed, or the repo has uncommitted files (they'd block apply later; ask the user to commit them) |
+| 0 Clone | `phases/0-clone.md`: `R --workflow <id> clone` | the clone is on `deps/<id>` | the clone failed, there's no main branch, or the clone is BLOCKED by another workflow's unpublished changes (say which workflow) |
 | 1 Scan | `phases/1-scan.md` | findings are summarised. **Default scope = every finding with a fix**; record it as "autopilot default, change it by replying `scope: ...`" | the Snyk CLI is missing or not logged in, and no report was given: tell the user the install/login commands, or to pass a Snyk JSON (`/dep-run <repo> <file>`). **Zero findings:** close the run as nothing to do (steps 2–6 `skipped --note "no findings"`) |
 | 2 Inventory | `phases/2-inventory.md` | no discrepancy; baseline taken | a discrepancy needs a decision, a target version doesn't exist, or the **baseline build is red** (an upgrade can't be verified on top of a broken build) |
 | 3 Analyze + plan | `phases/3-analyze.md` | — | **always stop after writing `03-plan.md`**: `W phase <id> 3 waiting`. Ask the user to review it and reply **"approve"**, or to say what to change |
@@ -39,9 +40,10 @@ Stop **only** at the stop points listed. Each step is tracked with `workflows.py
 
 Rules while running:
 - **Never** tick the approval box without the user's explicit words in *this* conversation.
+- **The clone gets code changes only**: every document, log and report goes to `workflows/<id>/`.
 - **Never** publish, push, commit, force anything, or touch other repos. Scope is the run's own `repos.txt`.
-- **Local folders are the user's checkout:** before step 4 switches it to `deps/<id>`, say so in the stop
-  message at step 3. ("Approving will switch `~/repos/x` to branch `deps/wf-NNN`.")
+- **All changes happen in the clone `repos/<name>/` on `deps/<id>`**, never in the user's own checkout. Say where
+  in the stop message at step 3 ("Approving will change `repos/<name>/` on branch `deps/wf-NNN`.")
 - A failing script is a stop, not something to work around. Show its output and the fix.
 
 ## C. Every run ends with this reply

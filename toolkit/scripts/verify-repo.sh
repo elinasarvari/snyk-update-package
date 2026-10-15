@@ -8,7 +8,10 @@
 #                 like Boot/Camel version mismatches that unit tests can miss)
 #   --build-cmd   override the auto-detected build command
 #
-# Outputs in <out-dir>: build.log, smoke.log, summary.json
+# Outputs in <out-dir>: build.log, smoke.log, summary.json - nothing is written into the repo itself.
+# The smoke boot runs with <out-dir> as its working folder, so files an app writes at runtime (logs, local
+# databases) land there, not in the repo. Any file the build leaves in the repo that git doesn't ignore is
+# reported in summary.json as "left_in_repo" (it is never deleted).
 # Exit code: 0 all green, 1 build/tests failed, 2 smoke failed, 3 unsupported repo
 set -uo pipefail
 
@@ -47,6 +50,10 @@ else
   reports="target/surefire-reports target/failsafe-reports build/test-results"
 fi
 
+# Files git would show as changed/untracked before we start - to spot anything the build adds.
+git_changes() { git status --porcelain --untracked-files=all 2>/dev/null | sort; }
+before_changes=$(git_changes)
+
 start=$(date +%s)
 bash -c "$build_cmd" > "$out/build.log" 2>&1
 build_exit=$?
@@ -80,7 +87,8 @@ if $smoke && [[ $build_exit -eq 0 ]]; then
   if [[ -z "$jar" ]]; then
     smoke_status="no-jar"
   else
-    java -jar "$jar" --server.port=0 > "$out/smoke.log" 2>&1 &
+    jar=$(cd "$(dirname "$jar")" && pwd)/$(basename "$jar")
+    (cd "$out" && exec java -jar "$jar" --server.port=0) > "$out/smoke.log" 2>&1 &
     pid=$!
     smoke_status="timeout"
     for _ in $(seq 1 90); do
@@ -94,6 +102,8 @@ if $smoke && [[ $build_exit -eq 0 ]]; then
     wait "$pid" 2>/dev/null
   fi
 fi
+
+left_in_repo=$(comm -13 <(echo "$before_changes") <(git_changes) | sed 's/^...//' | python3 -I -c "import json,sys;print(json.dumps([l.strip() for l in sys.stdin if l.strip()][:50]))")
 
 status="green"
 exit_code=0
@@ -113,6 +123,7 @@ summary = {
     "duration_s": $duration,
     "tests": json.loads('''$tests_json'''),
     "smoke": "$smoke_status",
+    "left_in_repo": json.loads('''$left_in_repo'''),
     "status": "$status",
 }
 with open(sys.argv[1], "w") as fh:
@@ -120,6 +131,9 @@ with open(sys.argv[1], "w") as fh:
 print(json.dumps(summary, indent=2))
 PY
 
+if [[ "$left_in_repo" != "[]" ]]; then
+  echo "--- WARNING: the build left files in the repo that git doesn't ignore: $left_in_repo"
+fi
 if [[ $build_exit -ne 0 ]]; then
   echo "--- first errors from build.log ---"
   grep -nE '\[ERROR\]|FAILED|error:|Caused by' "$out/build.log" | head -40

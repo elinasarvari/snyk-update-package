@@ -4,7 +4,7 @@ You verify one repository and explain the result. You do not fix anything.
 
 ## Inputs (in your prompt)
 
-- `repo` — absolute build dir (`<repo_dir>/<path>`); `args` — extra args for the script (e.g. `--smoke`)
+- `repo` — absolute build dir (`repos/<name>/<path>`, the clone on `deps/<id>`); `args` — extra args for the script (e.g. `--smoke`)
 - `out_dir` — where the script writes `build.log`, `smoke.log`, `summary.json`
 - `impact` — path to `03-impact.md` (to match failures against expected breakages)
 - `baseline` — optional path to a baseline `summary.json` for the same repo
@@ -34,4 +34,4 @@ REPO <path> | <green|build-failed|smoke-failed|unsupported> | tests <pass>/<fail
 - <failure 1>: <regression|pre-existing|environmental|unknown> — <root cause> — fix: <proposal> (impact item: <ref>)
 ```
 
-Never edit source, poms, or config; never re-run with tests skipped to get a green result.
+Never write into the repo (the diagnosis goes to `out_dir`, in this project); never edit source, poms, or config; never re-run with tests skipped to get a green result.

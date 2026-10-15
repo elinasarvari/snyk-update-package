@@ -1,37 +1,37 @@
-# Phase 0 — Add and check target repos
+# Phase 0 — Clone the repos and put them on the workflow's branch
 
-Make sure every repo in the list has a usable **repo folder**:
-- a **local folder**, which is the user's own checkout and is used in place; or
-- a **git URL**, which is cloned into `repos/<name>/`.
-
-This phase never discards, resets, pulls into a local folder, or switches branches.
+Every repo is cloned into `repos/<name>/`. **All code changes happen in that clone**, on the workflow's
+own branch `deps/<id>`, created from the latest main. The user's own checkouts elsewhere are never
+touched. This phase never discards, resets or stashes anything.
 
 ## Input
 
-- one or more local folders or git URLs (optionally with `name`, `path=`, `branch=`, `smoke=true`) → add them, then check;
-- repo names → check/refresh just those;
-- nothing → check/refresh everything in the list.
+- one or more git URLs, or local checkouts (only used to find their URL), optionally with `name`, `path=`,
+  `branch=`, `smoke=true` → add them, then clone;
+- repo names → clone/refresh just those;
+- nothing → every repo in the list (or in the workflow's own `repos.txt`).
 
 ## Steps
 
-1. **Add new repos:** `python3 -I toolkit/scripts/repos.py add <local-folder | git-url> [name] [path=<subdir>] [smoke=true]`.
-   - A local folder must start with `/`, `~`, `./` or `../` and contain `.git`. It's stored as `~/...` when under the home folder.
-   - If the user has the repo checked out already, **prefer the local folder**. Only use a URL for repos they don't have.
-   - If you don't know `path`, look for the folder holding `pom.xml`/`build.gradle` and fix the line in
-     `repos/repos.txt`. If there are several build roots, ask whether to add one entry each.
-2. **Check / refresh:** `python3 -I toolkit/scripts/repos.py clone [names...]`.
-   - **Local folders:** only checked. It fetches remote refs (files untouched) and reports the branch, uncommitted
-     files, commits behind `origin`, and whether it's on the expected `branch=`. It never pulls or switches.
-     Pass these notes on to the user. Pulling or switching is their decision.
-   - **URLs:**
-     - cloned if missing;
-     - fast-forwarded if clean and on the default (or configured) branch;
-     - **kept as is** if dirty or on another branch, e.g. `deps/<id>`.
-   - Failures: a wrong local path, a wrong URL, or no access (private repo: the user's git credentials or SSH key).
-     Report each and carry on with the rest.
-3. **Check:** `python3 -I toolkit/scripts/repos.py status`. The `TYPE` column is `local` or `clone`, and `FOLDER`
-   is where the code is. Confirm each `build_dir` from `repos.py list` contains `pom.xml` or `build.gradle*`.
-4. **If inside an upgrade:** record each repo's type, folder, branch and start commit in the STATUS "Repos" table,
-   then `python3 -I toolkit/scripts/workflows.py phase <id> 0 done`.
-5. Reply with the status table, any notes the user must act on (wrong branch, behind origin, uncommitted
-   files), and **▶ Next step** (usually `/dep-scan`).
+1. **Add new repos:** `python3 -I toolkit/scripts/repos.py add <git-url | local checkout> [name] [path=<subdir>] [smoke=true]`.
+   - A local checkout is turned into its `origin` URL. The list only ever holds URLs.
+   - If you don't know `path`, clone first (step 2), look for the folder holding `pom.xml`/`build.gradle`, then
+     fix the line in `repos/repos.txt`. If there are several build roots, ask whether to add one entry each.
+   - If the repo's main branch isn't called `main`, add `branch=<name>`.
+2. **Clone, and in a workflow switch to its branch:**
+   - Outside a workflow: `python3 -I toolkit/scripts/repos.py clone [names...]`. This clones missing repos and
+     fast-forwards clean clones that are on main.
+   - In a workflow: `python3 -I toolkit/scripts/repos.py --workflow <id> clone [names...]`. This also puts
+     each clone on `deps/<id>`:
+     - `created deps/<id> from origin/main` for a new workflow;
+     - `switched back to existing deps/<id>` or `on deps/<id>` when resuming;
+     - **`BLOCKED`** if the clone holds uncommitted changes of another workflow. Nothing is switched. Tell the
+       user which workflow; it has to be published or abandoned first.
+     - `NO 'main' BRANCH` → ask the user for the repo's main branch and add `branch=<name>`.
+   - A clone failure is usually authentication (private repo: the user's git credentials or SSH key) or a wrong
+     URL. Report it and carry on with the rest.
+3. **Check:** `python3 -I toolkit/scripts/repos.py --workflow <id> status`. Every repo must say `yes` in the
+   `ON deps/<id>?` column. Confirm each `build_dir` from `repos.py list` contains `pom.xml` or `build.gradle*`.
+4. **If inside a workflow:** record each repo's clone, branch and start commit in the STATUS "Repos" table, then
+   `python3 -I toolkit/scripts/workflows.py phase <id> 0 done`.
+5. Reply with the status table, anything the user must act on, and **▶ Next step** (usually `/dep-scan`).

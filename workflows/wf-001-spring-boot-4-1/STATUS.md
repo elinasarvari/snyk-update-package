@@ -57,3 +57,4 @@ Paused by the user: no upgrade will be applied. To resume later, run `/dep-upgra
 | 2026-10-15 16:30 | learning-java switched to local folder ~/repos/learning-java; baseline re-run: green, 39 tests |
 | 2026-10-15 15:18 | Renamed to wf-001 (unique workflow ids introduced) |
 | 2026-10-15 15:18 | Next step: Paused by the user: no upgrade will be applied. To resume later, run `/dep-upgrade wf-001`. |
+| 2026-10-15 16:21 | Design change: repos are always cloned into repos/<name>/; workflows work there on deps/wf-NNN (from the latest main). learning-java is now listed by URL; ~/repos/learning-java is no longer used. |

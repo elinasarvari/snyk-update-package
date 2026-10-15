@@ -202,6 +202,32 @@ class SafetyRules(unittest.TestCase):
             self.assertRegex(read(rel), r"(?i)never (re-run with tests skipped|hide red|delete or skip tests)|skip", rel)
 
 
+class BranchNamesAreConsistent(unittest.TestCase):
+    """Workflow wf-NNN always works on branch deps/wf-NNN - never deps/wf-NNN-<slug> or anything else."""
+    ALLOWED = re.compile(r"^deps/(<id>|<workflow-id>|wf-NNN|wf-\d{3,}|\{\{WORKFLOW_ID\}\}|\*|…)$")
+
+    def test_every_documented_workflow_branch_has_the_one_true_form(self):
+        bad = []
+        for base, dirs, files in os.walk(PROJECT):
+            dirs[:] = [d for d in dirs if d not in (".git", "repos", "tests", "__pycache__")]
+            for name in files:
+                if not name.endswith((".md", ".py", ".sh", ".yml")):
+                    continue
+                rel = os.path.relpath(os.path.join(base, name), PROJECT)
+                for m in re.finditer(r"deps/[^\s`'\")\],|]*", read(rel)):
+                    branch = m.group(0).rstrip(".:;")
+                    if branch in ("deps/", "deps") or self.ALLOWED.match(branch):
+                        continue
+                    if branch.startswith(("deps/<id>", "deps/<workflow-id>")):   # e.g. deps/<id>.
+                        continue
+                    bad.append("%s: %s" % (rel, branch))
+        self.assertEqual(bad, [], "workflow branches must be deps/wf-NNN")
+
+    def test_the_code_builds_the_branch_name_from_the_workflow_id_only(self):
+        self.assertIn('return "deps/" + wf_id', read("toolkit/scripts/repos.py"))
+        self.assertIn("`deps/{{WORKFLOW_ID}}`", read("toolkit/templates/STATUS.md"))
+
+
 class ScriptsAreSound(unittest.TestCase):
     def test_shell_scripts_parse_and_are_executable(self):
         scripts = os.path.join(PROJECT, "toolkit", "scripts")

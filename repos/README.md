@@ -1,109 +1,103 @@
-# repos/: the repositories this project works on
+# repos/: the repositories this project fixes
 
-`repos/repos.txt` is **the list of repos to fix**. Each line points at the repo in one of two ways:
-
-| You write | What happens | Where the changes go |
-|-----------|--------------|----------------------|
-| **a local folder** you already have, e.g. `~/repos/learning-java` | Used **in place**. Nothing is cloned or copied | Your own checkout, on a new branch `deps/<workflow-id>` |
-| **a git URL**, e.g. `https://github.com/my-org/orders.git` | Cloned into `repos/<name>/` here (git-ignored) | That clone, on branch `deps/<workflow-id>` |
-
-**In both cases the repo's code and changes stay in that repo.** This project (`snyk-update-package`)
-never stores them, and nothing here is a git submodule. Only `repos.txt` and this README are committed.
-The changes reach the repo's own GitHub as a pull request (`/dep-publish`).
+`repos/repos.txt` is **the list of repos to fix**. Each one is cloned into `repos/<name>/`, and **that clone is
+where the code changes happen**, on one branch per workflow. The tracking (steps, documents, history) lives
+in `workflows/`, not in the repo.
 
 ```text
-snyk-update-package/repos/
-├── README.md          ← this guide                                   (committed)
-├── repos.txt          ← THE LIST                                     (committed - you edit this)
-└── orders-service/    ← only for repos added by URL: a plain clone   (NOT committed)
+snyk-update-package/
+├── workflows/
+│   └── wf-002-learning-java/      ← tracking for Workflow 2: STATUS.md, docs, history
+└── repos/
+    ├── README.md                  ← this guide                       (committed)
+    ├── repos.txt                  ← THE LIST: git URLs               (committed - you edit this)
+    └── learning-java/             ← the clone: code changes go here  (NOT committed - git-ignored)
+        branches: main, deps/wf-001, deps/wf-002   ← one branch per workflow, each from the latest main
 
-~/repos/learning-java/ ← a repo added as a local folder: stays exactly where it is
+~/repos/learning-java/             ← your own checkout, if you have one: never touched
 ```
 
-**Which one should I use?**
-- **The repo is already on your machine:** use the **local folder**. You'll see the upgrade in your normal
-  checkout, and there's no second copy to keep in sync.
-- **You don't have it checked out, or you want the upgrade fully separate from your own work:** use the **git URL**.
+- **Your own checkouts are never touched.** The workflow never switches their branch, never edits them, and
+  never creates branches in them.
+- **The clone is a normal git repo.** You can open `repos/learning-java/` in VS Code to look at a workflow's
+  changes, e.g. `git -C repos/learning-java diff main...deps/wf-002`.
+- **The changes reach the repo's GitHub as a pull request** from branch `deps/wf-NNN` (`/dep-publish`). Nothing
+  is ever pushed to `main`.
+- **No submodules.** This project never records the repos inside itself; only `repos.txt` and this README are
+  committed.
 
 ---
 
 ## Step 1: Add a repo to the list
 
-Open [`repos.txt`](repos.txt) and add one line per repo:
+Add one line per repo to [`repos.txt`](repos.txt):
 
 ```text
-<name>          <local folder or git URL>                     [options]
-learning-java   ~/repos/learning-java                         branch=main  path=backend  smoke=true
-orders-service  https://github.com/my-org/orders-service.git  branch=develop
-billing         git@bitbucket.org:my-team/billing.git
+<name>          <git-url>                                          [options]
+learning-java   https://github.com/elinasarvari/learning-java.git  path=backend  smoke=true
+orders-service  git@github.com:my-org/orders-service.git           branch=develop
 ```
 
 | Part | Required | Meaning | Example |
 |------|----------|---------|---------|
-| `name` | yes | Short name you use in commands. For URLs, also the clone folder `repos/<name>/` | `orders-service` |
-| local folder | one of these | Path to your checkout. Must start with `/`, `~`, `./` or `../` | `~/repos/learning-java` |
-| git URL | one of these | The URL you'd give `git clone`: the green **Code** button on GitHub | `https://github.com/my-org/orders-service.git` |
-| `branch=` | no | URL: the branch to clone and keep updated. Local folder: the branch you expect it on; you're warned if it isn't, but it's never switched for you | `branch=main` |
+| `name` | yes | Clone folder `repos/<name>/`, and the name you use in commands | `orders-service` |
+| `git-url` | yes | The URL you'd give `git clone`: the green **Code** button on GitHub | `https://github.com/my-org/orders-service.git` |
+| `branch=` | no | The repo's main branch, if it isn't called `main`. Workflow branches start from it | `branch=develop` |
 | `path=` | no | Sub-folder with `pom.xml` / `build.gradle`, if not at the repo root | `path=backend` |
 | `smoke=true` | no | Also start the app during verification, to catch startup-only failures | `smoke=true` |
 | `build=` | no | Your own build command, if the default doesn't fit | `build="./mvnw -B -Pci verify"` |
 
-Or add it with a command, or by asking in chat:
+Or let the tools write the line:
 
 ```bash
-python3 -I toolkit/scripts/repos.py add ~/repos/orders-service path=api                  # local folder
-python3 -I toolkit/scripts/repos.py add https://github.com/my-org/orders-service.git     # git URL
+python3 -I toolkit/scripts/repos.py add https://github.com/my-org/orders-service.git path=api
+python3 -I toolkit/scripts/repos.py add ~/repos/orders-service     # already checked out? its URL is looked up for you
 ```
 
-In Copilot or Claude chat: `/dep-clone ~/repos/orders-service` or `/dep-clone <git-url>`.
+In chat, `/dep-run <git-url>` (or `/dep-run ~/repos/orders-service`) adds it for you as well.
 
-**Sharing this list:** local folders are specific to your machine. If someone else uses your `repos.txt`,
-they change the paths to their own, or use the git URL instead.
+**HTTPS or SSH?** Use whatever already works for you with `git clone`:
+- HTTPS uses your saved GitHub login (macOS Keychain) or a token;
+- SSH uses your key (`ssh -T git@github.com` to test);
+- private repos need *your* account to have access.
 
-**For git URLs, HTTPS or SSH?** Use whatever already works for you with plain `git clone`:
-- **HTTPS** (`https://github.com/...`) uses your saved GitHub login (macOS Keychain) or a token.
-- **SSH** (`git@github.com:...`) uses your SSH key. Test it with `ssh -T git@github.com`.
-- **Private repos** need *your* account to have access.
-
-## Step 2: Check (and clone the URL ones)
-
-From the project root (the `snyk-update-package` folder):
+## Step 2: Clone
 
 ```bash
-python3 -I toolkit/scripts/repos.py clone                   # every repo in the list
-python3 -I toolkit/scripts/repos.py clone orders-service    # just one
+python3 -I toolkit/scripts/repos.py clone                  # every repo in the list
+python3 -I toolkit/scripts/repos.py clone orders-service   # just one
 ```
 
-Or in chat: `/dep-clone`
+Or `/dep-clone` in chat. You rarely need to do this yourself: `/dep-run` clones as its first step.
 
-What it prints, per repo:
+| Message | Meaning |
+|---------|---------|
+| `cloned into repos/<name>` | Done |
+| `up to date` | Already cloned; fetched and fast-forwarded on main |
+| `kept as is - on deps/wf-NNN` | A workflow is using the clone; it was fetched but not switched |
+| `kept as is - N uncommitted file(s)` | Unpublished changes in the clone; left alone |
+| `CLONE FAILED: …` | Wrong URL or no access. Try `git clone <url>` by hand to see why |
+| `WARNING: path=… does not exist` | The `path=` option is wrong |
 
-| Message | Type | Meaning |
-|---------|------|---------|
-| `local, used in place (main @ 5f3f485)` | local | Found your folder. Nothing was changed |
-| `… \| on X, expected main - switch it yourself if needed` | local | Your checkout is on another branch. It's left alone; switch it if the upgrade should start from `main` |
-| `… \| N uncommitted file(s)` | local | `/dep-apply` will wait until you commit them, so your work is never mixed into the upgrade |
-| `… \| N commit(s) behind origin` | local | Run `git pull` in that folder if you want the latest code first |
-| `LOCAL FOLDER NOT FOUND or not a git repo` | local | Wrong path in `repos.txt` |
-| `cloned` | URL | Cloned into `repos/<name>/` |
-| `up to date` | URL | Already cloned; fetched and fast-forwarded |
-| `kept as is - …` | URL | The clone has local changes or is on `deps/…`; it won't touch it |
-| `CLONE FAILED: …` | URL | Wrong URL or no access. Try `git clone <url>` by hand to see why |
-| `WARNING: path=… does not exist` | both | The `path=` option is wrong |
+## Step 3 (done for you by every workflow): the workflow's branch
 
-## Step 3: Check the status
+When a workflow starts (`/dep-run`, or `repos.py --workflow <id> clone`), each clone is put on that workflow's
+branch:
+
+| Message | Meaning |
+|---------|---------|
+| `created deps/wf-002 from origin/main @ 5f3f485` | New workflow: a fresh branch from the **latest** main |
+| `switched back to existing deps/wf-001` / `on deps/wf-001` | Resuming a workflow: its earlier work is still there |
+| `BLOCKED: … unpublished changes of workflow wf-001` | Another workflow's changes aren't published yet. Nothing was switched. Publish or abandon that one first |
+| `NO 'main' BRANCH` | The repo's main branch has another name: add `branch=<name>` to its line |
 
 ```bash
-python3 -I toolkit/scripts/repos.py status
+python3 -I toolkit/scripts/repos.py --workflow 2 status    # is every clone on deps/wf-002?
+python3 -I toolkit/scripts/repos.py --workflow 2 release   # finished: back to main (the branch is kept)
 ```
 
-```text
-REPO                 TYPE   COMMIT   BRANCH        DIRTY  AHEAD  BEHIND  FOLDER
-learning-java        local  5f3f485  main          0      0      0       ~/repos/learning-java
-orders-service       clone  9c1e2aa  develop       0      0      0       ~/repos/snyk-update-package/repos/orders-service
-```
-
-`FOLDER` is where the code is, and where the upgrade will make its changes.
+**One workflow at a time per repo.** Each workflow has its own branch, but a clone can only be on one branch
+at a time. Workflows on *different* repos never get in each other's way.
 
 ---
 
@@ -111,17 +105,16 @@ orders-service       clone  9c1e2aa  develop       0      0      0       ~/repos
 
 | I want to… | Do this |
 |------------|---------|
-| Get the latest code | URL repos: `repos.py clone`. Local folders: `git pull` in the folder yourself |
-| Work on only some repos in one upgrade | Create `workflows/<id>/repos.txt` with just those lines (same format) |
-| See what an upgrade changed | `git -C <folder> diff`. The changes are on branch `deps/<workflow-id>` |
-| Go back to my own branch after an upgrade (local folder) | `git -C <folder> switch main`. The `deps/<id>` branch stays until you delete it |
-| Stop working on a repo | Delete its line. For URL repos, also `rm -rf repos/<name>` once you no longer need the clone |
+| See what a workflow changed | `git -C repos/<name> diff main...deps/wf-NNN`, or open `repos/<name>/` in VS Code |
+| Get the latest code | `repos.py clone` (clones on main are fast-forwarded; new workflows always start from the latest main anyway) |
+| Work on only some repos in one workflow | `/dep-run <repo>` scopes the workflow to that repo (`workflows/<id>/repos.txt`) |
+| Stop working on a repo | Delete its line, then `rm -rf repos/<name>` once nothing in it is needed |
 
-## What the tools will and won't do to a repo folder
+## What each command does to a clone
 
-| Step | Local folder (your checkout) | URL clone in `repos/<name>/` |
-|------|------------------------------|------------------------------|
-| `/dep-clone` | Looks only: fetches remote refs, never pulls, switches or edits | Clones, or fast-forwards if clean |
-| `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-verify` | Read-only. Builds create `target/` / `build/` | same |
-| `/dep-apply` | **Switches your checkout to a new branch `deps/<id>`** and edits files there. You're told before it starts. Refuses if you have uncommitted changes | Same, inside the clone |
-| `/dep-publish` | Commits on `deps/<id>`, pushes that branch, opens a PR. Never pushes to `main`, never force-pushes | same |
+| Command | Effect on `repos/<name>/` |
+|---------|---------------------------|
+| `/dep-clone`, first step of `/dep-run` | Clones it; in a workflow, puts it on `deps/<id>` from the latest main |
+| `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-verify` | Read-only (builds create `target/` / `build/`) |
+| `/dep-apply` | Edits files on `deps/<id>`, only after you approved the plan. Nothing is committed |
+| `/dep-publish` | Commits on `deps/<id>`, pushes that branch, opens a PR. Never pushes to `main`, never force-pushes |

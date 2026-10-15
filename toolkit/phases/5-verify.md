@@ -23,11 +23,13 @@ Build, test and boot every target repo. Also usable on its own as a health check
 5. **Re-scan (if the Snyk CLI is available):** run phase 1 step 3 into `workflows/<id>/snyk-after/` and parse
    it. Add "Snyk findings before → after" to the report. This proves the targeted issues are gone and
    that nothing new came in.
-6. **Assemble `05-verification.md`:** the Result table, a Failures section per red repo (regression /
+6. **Clone hygiene:** if any `summary.json` has a non-empty `left_in_repo`, list those files under Failures as
+   `environmental` (the build writes outside `target/`). They are never committed: publish stages only the plan's files.
+7. **Assemble `05-verification.md`:** the Result table, a Failures section per red repo (regression /
    pre-existing / environmental / unknown), and the Verdict.
-7. `python3 -I toolkit/scripts/workflows.py phase <id> 5 done` if every repo is green, or only pre-existing/environmental failures remain
+8. `python3 -I toolkit/scripts/workflows.py phase <id> 5 done` if every repo is green, or only pre-existing/environmental failures remain
    (say which). Otherwise ⛔.
-   - ▶ Next step when green: "review the diff (`git -C <repo_dir> diff`), then `/dep-publish <id>`".
+   - ▶ Next step when green: "review the diff (`git -C repos/<name> diff main...deps/<id>`), then `/dep-publish <id>`".
    - ▶ Next step when red: the fix for each regression. Add it as new plan steps (needs
      re-approval), then `/dep-apply` → `/dep-verify` again.
-8. Never re-run with tests skipped to manufacture a green result.
+9. Never re-run with tests skipped to manufacture a green result.

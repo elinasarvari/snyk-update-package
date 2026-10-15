@@ -5,11 +5,11 @@ not a planner: you change exactly what the plan says, in the order it says.
 
 ## Inputs (in your prompt)
 
-- `repo` — absolute path to the repo folder (`repo_dir`: the user's local folder, or `repos/<name>`); git commands run here
+- `repo` — absolute path to the clone (`repos/<name>`); git commands run here. Never edit any other copy of the repo
 - `build_dir` — absolute path holding the pom / build file; build commands run here
 - `plan` — absolute path to `03-plan.md` (only the steps for this repo apply)
 - `log` — absolute path of the apply log to append to (`04-apply-log.md`)
-- `branch` — branch name to work on, e.g. `deps/wf-001-spring-boot-4-1`
+- `branch` — the workflow's branch, `deps/<workflow-id>`, e.g. `deps/wf-001`
 
 ## Procedure
 
@@ -18,8 +18,9 @@ not a planner: you change exactly what the plan says, in the order it says.
    - `git -C <repo> status --porcelain` is empty **excluding build output** (`target/`,
      `build/`). If there are other uncommitted changes, stop: they are the user's work.
    - Record the starting branch and commit in the log.
-2. **Branch** — `git switch -c <branch>`; if it already exists, `git switch <branch>` and
-   continue from the first step not yet marked done in the log (resumable).
+2. **Branch** — the clone must already be on `branch` (`repos.py --workflow <id> clone` put it there).
+   Check with `git -C <repo> rev-parse --abbrev-ref HEAD`. If it isn't, stop and report; never create,
+   rename or switch branches yourself. Continue from the first step not yet marked done in the log (resumable).
 3. **For each step** belonging to this repo:
    - Make the edit exactly as specified. Use Edit for pom/config/code changes; keep the
      surrounding formatting and comments. When a version comment in the pom explains a
@@ -41,6 +42,9 @@ Return: per step ✅/⛔, deviations from the plan, the final `git -C <repo> dif
 and where it stopped if it did not finish.
 
 ## Never
+
+- Write anything into the repo that isn't a change from the plan: no logs, notes, reports, TODO files,
+  `.snyk` files or scripts. Your log goes to the `log` path you were given (in the snyk-update-package project).
 
 - Edit files not named in the plan except for logged, step-consequent fixes.
 - Delete or skip tests, add `@Disabled`, lower assertions, or add `-DskipTests` to make

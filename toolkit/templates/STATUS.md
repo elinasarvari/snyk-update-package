@@ -28,8 +28,8 @@ Run `/dep-scan {{WORKFLOW_ID}}` to list every package Snyk flags (or `/dep-inven
 
 ## Repos
 
-| Repo | Type | Folder | Start commit | Baseline (before) | After upgrade | PR |
-|------|------|--------|--------------|-------------------|---------------|----|
+| Repo | Clone (where changes happen) | Branch | Created from | Baseline (before) | After upgrade | PR |
+|------|------------------------------|--------|--------------|-------------------|---------------|----|
 
 ## Decisions and open questions
 

@@ -1,5 +1,5 @@
-# Repos added by git URL are cloned into repos/<name>/ and never committed here.
-# (Repos added as a local folder stay where they are.) Only the list and its README are tracked.
+# Every repo is cloned into repos/<name>/ - its code and the workflow changes stay there, never committed here.
+# Only the list and its README are tracked.
 repos/*
 !repos/repos.txt
 !repos/README.md

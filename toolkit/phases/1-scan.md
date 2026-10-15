@@ -18,7 +18,10 @@ upgraded in isolation. Read-only.
 2. **Repo folders:** if any repo in the list has no folder yet (URL not cloned, or wrong local path), run phase 0 first.
 3. **Scan** (only when no report was supplied):
    `bash toolkit/scripts/snyk-scan.sh workflows/<id>/snyk [--manifest workflows/<id>/repos.txt] [--org=<org>]`
-   - Exit 127/126 means the CLI is missing or not logged in. Stop and give the user the commands
+   - The script prints `Using Snyk CLI: <path>`. It takes `$SNYK_CLI` (e.g. the CLI the Snyk VS Code extension
+     downloaded), then `snyk` on PATH, then the extension's usual download folders.
+   - Exit 127 = no CLI found (suggest `export SNYK_CLI=<path from the extension's settings>`, or installing it);
+     126 = not logged in (suggest `"$SNYK_CLI" auth`, which uses the same SSO account as the extension). Stop and give the user the commands
      the script printed. Don't install or log in for them.
    - Per-repo results are in `snyk/scan-index.tsv`: 0 clean, 1 findings, 2 failed, 3 no supported
      project. A failed repo is reported, never silently dropped.

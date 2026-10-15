@@ -291,7 +291,7 @@ def cmd_show(args):
     print("Workflow %d (%s): %s" % (wf[0], wf[1], re.sub(r"^(Workflow \d+:|Upgrade:)\s*", "", info["title"])))
     print("Folder:  %s" % os.path.relpath(wf[3], ROOT))
     print("Repos:   %s" % (", ".join(scope) if scope else "all of repos/repos.txt"))
-    print("Branch:  deps/%s" % wf[1])
+    print("Branch:  %s" % ("deps/" + wf[1]))   # same rule as repos.py branch_for()
     print("")
     for p in info["phases"]:
         print("  %d  %-28s %s" % (p["n"], p["name"], p["state"]))

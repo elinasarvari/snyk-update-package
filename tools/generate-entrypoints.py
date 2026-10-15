@@ -16,8 +16,8 @@ PHASES = [
     # name, phase file, description, argument hint, subagents, manual-only, handoffs [(label, agent, prompt)]
     # phase file: a name in toolkit/phases/, a path starting with toolkit/, or None for the orchestrator.
     ("dep-run", "toolkit/RUN.md",
-     "Autopilot for ONE repo (name, local folder or git URL): opens or resumes its workflow (wf-NNN) and runs every step - clone, Snyk scan, inventory, impact + plan - then stops for your approval; after you approve, applies and verifies, then stops before publish. Always ends with what to do next.",
-     "<repo name | local folder | git URL> [workflow id] [snyk.json] [your reply: approve | scope: ... | decision]",
+     "Autopilot for ONE repo (name, git URL, or a local checkout to take the URL from): opens or resumes its workflow (wf-NNN), works in its clone under repos/ on branch deps/wf-NNN, and runs every step - clone, Snyk scan, inventory, impact + plan - then stops for your approval; after you approve, applies and verifies, then stops before publish. Always ends with what to do next.",
+     "<repo name | git URL | local checkout> [workflow id] [snyk.json] [your reply: approve | scope: ... | decision]",
      ["dependency-analyst", "upgrade-applier", "repo-verifier"], True,
      [("Approve the plan and continue", "dep-run", "I have reviewed 03-plan.md for this workflow and approve it as written. Continue: apply and verify."),
       ("Publish the PRs", "dep-publish", "Verification is green. Commit, push and open PRs for this workflow."),
@@ -29,8 +29,8 @@ PHASES = [
      [("Apply the approved plan", "dep-apply", "I have reviewed 03-plan.md for this upgrade and approve it as written. Record my approval and apply it."),
       ("Verify all repos", "dep-verify", "Verify all repos for this upgrade.")]),
     ("dep-clone", "0-clone.md",
-     "Phase 0 - add target repos to repos/repos.txt as a local folder (used in place) or a git URL (cloned into repos/), then check/refresh them. Never resets, pulls local folders, or switches branches.",
-     "[local-folder | git-url [name] [path=<subdir>] [smoke=true] | repo-name ... | (empty = all)]", [], False,
+     "Phase 0 - add repos to repos/repos.txt (git URL, or a local checkout to take the URL from), clone them into repos/<name>/, and in a workflow put each clone on its branch deps/wf-NNN from the latest main. Never touches your own checkouts or another workflow's unpublished changes.",
+     "[git-url | local checkout [name] [path=<subdir>] [smoke=true] | repo-name ... | (empty = all)]", [], False,
      [("Next: Snyk scan", "dep-scan", "Run the Snyk scan over all repos in the list.")]),
     ("dep-scan", "1-scan.md",
      "Phase 1 - run Snyk over every repo in the list (or parse supplied Snyk JSON / pasted output) and document EVERY flagged package: current version, severity, CVEs, fixed-in, how it is introduced, remediation - in 01-snyk-findings.md plus CSV. Read-only.",
@@ -45,7 +45,7 @@ PHASES = [
      "<workflow-id>", ["dependency-analyst"], False,
      [("I approve the plan - apply it", "dep-apply", "I have reviewed 03-plan.md for this upgrade and approve it as written. Record my approval and apply it.")]),
     ("dep-apply", "4-apply.md",
-     "Phase 4 - applies the USER-APPROVED 03-plan.md to each repo folder on branch deps/<workflow-id> via upgrade-applier subagents, compiling per step, logging to 04-apply-log.md. Edits the repo folders; never commits.",
+     "Phase 4 - applies the USER-APPROVED 03-plan.md to each repo's clone under repos/ on branch deps/<workflow-id> via upgrade-applier subagents, compiling per step, logging to 04-apply-log.md. Edits the clones; never commits.",
      "<workflow-id> [repo-name ...]", ["upgrade-applier"], True,
      [("Next: verify all repos", "dep-verify", "Verify all repos for this upgrade against the baseline.")]),
     ("dep-verify", "5-verify.md",
@@ -54,7 +54,7 @@ PHASES = [
      [("Green: publish PRs", "dep-publish", "Verification is green. Commit, push and open PRs for this upgrade."),
       ("Red: re-plan the fixes", "dep-analyze", "Add plan steps that fix the regressions in 05-verification.md for this upgrade (needs my re-approval).")]),
     ("dep-publish", "6-publish.md",
-     "Phase 6 - commits the verified changes in each repo folder, pushes deps/<workflow-id> and opens a pull request per target repo with a description built from the upgrade docs; records PR links in 06-publish.md. Only when the user asks.",
+     "Phase 6 - commits the verified changes in each clone, pushes deps/<workflow-id> and opens a pull request per target repo with a description built from the upgrade docs; records PR links in 06-publish.md. Only when the user asks.",
      "<workflow-id> [repo-name ...]", [], True, []),
 ]
 
