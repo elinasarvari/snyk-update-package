@@ -65,6 +65,7 @@ toolkit starts the login and **your browser opens by itself**:
 | Am I logged in? | `bash toolkit/scripts/snyk-login.sh --status` | `... snyk-login.ps1 --status` |
 | Log out | `bash toolkit/scripts/snyk-login.sh --logout` | `... snyk-login.ps1 --logout` |
 
+Step by step, with what you'll see: **[Logging in to Snyk](#logging-in-to-snyk-step-by-step)**.
 Or in chat: **`/dep-login`**. You rarely need any of these: if a scan finds the CLI isn't logged in, `/dep-scan`
 and `/dep-run` start the login themselves and retry. You only sign in in the browser window that opens.
 
@@ -151,6 +152,86 @@ and where it stands, open [`workflows/INDEX.md`](workflows/INDEX.md) or run **`/
 **6. Read the results** in `workflows/<id>/`. Start with `STATUS.md`.
 
 ---
+
+## Logging in to Snyk, step by step
+
+You do this **once per machine**. It's the same company SSO login as the VS Code extension's "Authenticate"
+button, started from the toolkit, with your browser doing the sign-in. No client ID or secret needed.
+
+**1. Make the Snyk CLI available** (skip this if `snyk --version` already works).
+
+| | macOS | Windows (PowerShell) |
+|---|---|---|
+| Use the CLI the VS Code extension downloaded (path: VS Code → Settings → Snyk → Advanced → CLI path) | `export SNYK_CLI="<that path>"` | `$env:SNYK_CLI = "<that path>"` |
+| …or install it | `brew tap snyk/tap && brew install snyk-cli` | `npm install -g snyk` |
+
+**2. Start the login** from the `snyk-update-package` folder:
+
+```bash
+bash toolkit/scripts/snyk-login.sh                                           # macOS
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-login.ps1      # Windows
+```
+
+Or type **`/dep-login`** in Copilot or Claude chat. `/dep-scan` and `/dep-run` also start it by themselves when needed.
+
+**3. The terminal says:**
+
+```text
+Using Snyk CLI: /path/to/snyk
+Opening your browser for the Snyk login (OAuth2). Sign in with your company SSO, then come back here.
+If no browser opens, copy the link the Snyk CLI prints below into your browser.
+```
+
+**4. Sign in, in the browser window that opens.** Choose your company's SSO option on the Snyk page (often "Log in
+with SSO", where you enter your work email), then sign in as usual: your password, plus MFA if your company uses it.
+Your password goes only to your company's sign-in page, never to the toolkit or the terminal.
+
+**5. When the browser says you're signed in, close the tab and go back to the terminal.** It finishes with:
+
+```text
+Logged in to Snyk as you@company.com
+```
+
+**6. Check it any time:**
+
+```bash
+bash toolkit/scripts/snyk-login.sh --status                                          # macOS
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-login.ps1 --status     # Windows
+```
+
+That's it. The CLI keeps a token that renews itself, so scans just work from now on. You only sign in again after
+`--logout`, or if your company's SSO policy ends the session.
+
+### What the messages mean
+
+| You see | Meaning | What to do |
+|---------|---------|------------|
+| `Logged in to Snyk as …` | Snyk accepted the login | Nothing: you're done |
+| `Already logged in to Snyk as … - nothing to do` | You were already logged in; no browser opened | Nothing |
+| `Not logged in to Snyk - run: …` | (`--status`) No valid login | Run step 2 |
+| `Snyk login did not complete. …` | The sign-in was cancelled, timed out, or SSO isn't set up for you | Run step 2 again. If it keeps failing, ask your Snyk admin to check that SSO login is enabled for your account |
+| `Note: SNYK_TOKEN / SNYK_OAUTH_TOKEN is set in this shell, Snyk rejects it, …` | An old or wrong token in your environment overrides the login | Remove it (`unset SNYK_TOKEN` on macOS, `Remove-Item Env:SNYK_TOKEN` on Windows), then step 2 |
+| `Snyk CLI not found. …` | Step 1 isn't done | Do step 1 |
+
+**How the toolkit knows you're logged in:** it doesn't guess. It runs `snyk whoami`, which sends the stored token to
+Snyk. Only if Snyk answers with your username does it count as logged in, so an expired or revoked login is caught
+before a scan starts.
+
+### Special cases
+
+| Situation | Do this |
+|-----------|---------|
+| **No browser opens** (e.g. remote desktop) | Copy the link the CLI prints into any browser and sign in there |
+| **Your Snyk is in another region** (EU / AU) or a private instance | Run step 2 with `--endpoint <url>` once, e.g. `--endpoint https://api.eu.snyk.io`. Get the exact URL from your Snyk admin |
+| **Automation / build machine** (no person to sign in) | With a Snyk service account (Enterprise plan), set `SNYK_CLIENT_ID` and `SNYK_CLIENT_SECRET`, then run step 2: it logs in without a browser |
+| **Log out** | `--logout` on the same command |
+| **Sign in again anyway** | `--force` on the same command |
 
 ## The commands
 
