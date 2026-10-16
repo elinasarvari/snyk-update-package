@@ -110,7 +110,7 @@ py -3 -I toolkit\scripts\repos.py status
 Every option, HTTPS vs SSH, private repos, and what each message means: **[repos/README.md](repos/README.md)**.
 
 **4. Open this folder** in VS Code with GitHub Copilot (first time: **[Setting up GitHub Copilot](#setting-up-github-copilot-vs-code)**),
-or run `claude` in it.
+or start Claude Code in it (first time: **[Setting up Claude Code](#setting-up-claude-code)**).
 
 **5. Run it: the easy way.** Give `/dep-run` one repo (its name, its git URL, or a checkout of it):
 
@@ -222,6 +222,90 @@ VS Code's own guides: [prompt files](https://code.visualstudio.com/docs/copilot/
 [custom agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents) ·
 [agent skills](https://code.visualstudio.com/docs/copilot/customization/agent-skills) ·
 [custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions).
+
+## Setting up Claude Code
+
+Claude Code reads this project's `.claude/` folder and `CLAUDE.md` by itself, so the `/dep-*` commands are there as
+soon as you start it **in this folder**. Nothing else to configure.
+
+**1. Install Claude Code** (once):
+
+| | macOS | Windows |
+|---|---|---|
+| Install | `curl -fsSL https://claude.ai/install.sh \| bash` (or `brew install --cask claude-code`) | In PowerShell: `irm https://claude.ai/install.ps1 \| iex` (or `winget install Anthropic.ClaudeCode`). No Administrator needed |
+| Check | `claude --version` | `claude --version` |
+
+If `claude` isn't found, open a **new** terminal. On Windows, [Git for Windows](https://git-scm.com/download/win) is
+recommended (you need Git for this project anyway).
+
+**2. Start it in the project folder.** This matters: the commands and the folder restrictions are only picked up
+when Claude Code starts **inside `snyk-update-package`**.
+
+```bash
+cd ~/snyk-update-package        # wherever you cloned it  (Windows: cd $HOME\snyk-update-package)
+claude
+```
+
+**3. Log in to Claude** the first time: a browser window opens. Use a Claude **Pro, Max, Team or Enterprise**
+account, or a **Claude Console** (API) account; the free plan doesn't include Claude Code. Later, `/login` switches
+accounts.
+
+**4. Check the commands are there.** Type **`/dep`**: autocomplete shows all ten, with a hint for what each one
+takes (e.g. `/dep-run <repo name | git URL | local checkout> …`). `/skills` lists them too.
+
+| Command | What it's for |
+|---------|---------------|
+| `/dep-run <repo>` | **Start here:** runs every step for one repo, stops for your approval |
+| `/dep-login` | Log the Snyk CLI in (browser SSO) |
+| `/dep-upgrade status` | Where every workflow stands |
+| `/dep-clone`, `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-apply`, `/dep-verify`, `/dep-publish` | The steps one by one |
+
+The helpers in `.claude/agents/` (`dependency-analyst`, `upgrade-applier`, `repo-verifier`) aren't commands. Claude
+starts them by itself during `/dep-analyze`, `/dep-apply`, `/dep-verify` and `/dep-run`.
+
+**5. First run.**
+
+```text
+! bash toolkit/scripts/snyk-login.sh                                              Snyk login, macOS
+! powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-login.ps1         Snyk login, Windows
+/dep-run inventory-service                                                        or your own repo
+```
+
+- **Why `!` for the Snyk login:** a line starting with `!` runs the command yourself, right in the session, and its
+  output goes into the conversation. The browser login waits until you've signed in, which works best as your own
+  command. `/dep-login` works too, but Claude may ask you to run exactly this.
+- **Claude asks before it runs a command.** Choose *Yes*, *Yes, and don't ask again* (saved in
+  `.claude/settings.local.json`, which is git-ignored), or *No*. Every step runs `toolkit/scripts/…`, `git …` or a
+  build such as `mvnw`. `/permissions` shows and edits what you've allowed.
+- **`/dep-run`, `/dep-apply` and `/dep-publish` only start when you type them.** Claude can't start them on its own,
+  and the plan approval is always your reply.
+
+**What Claude Code picks up by itself from this folder:**
+
+| File | Effect |
+|------|--------|
+| `CLAUDE.md` | Project rules in every session: changes only in `repos/<name>/` clones, never publish without you, run the tests |
+| `.claude/skills/dep-*/` | The ten `/dep-*` commands |
+| `.claude/agents/` | The three helpers |
+| `.claude/settings.json` | Claude may not read or edit inside `target/`, `node_modules/`, `.git/` … under `repos/` (`/permissions` lists these rules) |
+
+**In VS Code instead of a terminal:** the [Claude Code extension](https://code.claude.com/docs/en/vs-code)
+(`anthropic.claude-code`) uses the same project files, but the `!` shortcut isn't available there. Run the Snyk login
+in VS Code's terminal instead. For everything the terminal version can do, run `claude` in VS Code's terminal.
+
+### If something's missing
+
+| Problem | Fix |
+|---------|-----|
+| `claude: command not found` | Open a new terminal. Still missing: run the install command again |
+| `/dep-…` doesn't appear | You started Claude Code in another folder. Quit (`/exit`), `cd` into `snyk-update-package`, run `claude` again. `/skills` should list them |
+| Login problems, or "Claude Code isn't included" | Your account needs Pro, Max, Team, Enterprise or Console access. `/status` shows which account you're on, `/login` switches |
+| Claude reads files inside `target/` | Check `/permissions` lists the deny rules from `.claude/settings.json`. They apply when Claude Code is started in this folder |
+| Anything else odd | `/doctor` inside a session, or `claude doctor` in the terminal, checks the install and settings |
+
+Claude Code's own guides: [setup](https://code.claude.com/docs/en/setup) ·
+[skills](https://code.claude.com/docs/en/skills) · [subagents](https://code.claude.com/docs/en/sub-agents) ·
+[permissions](https://code.claude.com/docs/en/permissions) · [memory / CLAUDE.md](https://code.claude.com/docs/en/memory).
 
 ## Logging in to Snyk, step by step
 
@@ -613,7 +697,7 @@ every document must cite `file:line` or a source URL, and why nothing changes yo
 
 | Symptom | Fix |
 |---------|-----|
-| `/dep-*` commands don't appear | Open **this folder** as the workspace root. In Copilot: Session Target **Local**, see [Setting up GitHub Copilot](#setting-up-github-copilot-vs-code) |
+| `/dep-*` commands don't appear | Open **this folder** as the workspace root. Copilot: Session Target **Local**, see [Setting up GitHub Copilot](#setting-up-github-copilot-vs-code). Claude Code: start `claude` inside this folder, see [Setting up Claude Code](#setting-up-claude-code) |
 | Clone fails for a private repo | Your git credentials/SSH key must have access: test with `git clone <url>` |
 | `snyk-scan.sh` exits 127 | No CLI found: set `SNYK_CLI` to the path from the VS Code extension's settings, or install it (see Quick start) |
 | `snyk-scan.sh` exits 126 | Not logged in: run `snyk-login.sh` / `snyk-login.ps1` (or `/dep-login`); a browser opens for your SSO sign-in |
