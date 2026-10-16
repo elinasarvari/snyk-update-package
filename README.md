@@ -109,7 +109,8 @@ py -3 -I toolkit\scripts\repos.py status
 
 Every option, HTTPS vs SSH, private repos, and what each message means: **[repos/README.md](repos/README.md)**.
 
-**4. Open this folder** in VS Code (Copilot Chat → **Agent** mode) or run `claude` in it.
+**4. Open this folder** in VS Code with GitHub Copilot (first time: **[Setting up GitHub Copilot](#setting-up-github-copilot-vs-code)**),
+or run `claude` in it.
 
 **5. Run it: the easy way.** Give `/dep-run` one repo (its name, its git URL, or a checkout of it):
 
@@ -152,6 +153,75 @@ and where it stands, open [`workflows/INDEX.md`](workflows/INDEX.md) or run **`/
 **6. Read the results** in `workflows/<id>/`. Start with `STATUS.md`.
 
 ---
+
+## Setting up GitHub Copilot (VS Code)
+
+The `/dep-*` commands are ordinary files in this project (`.github/prompts`, `.github/agents`, `.github/skills`,
+`.github/instructions`, `.github/copilot-instructions.md`). VS Code finds them when this folder is open; there's
+nothing to install or configure in Copilot itself.
+
+**1. Install VS Code and GitHub Copilot.** Install [VS Code](https://code.visualstudio.com/) (keep it up to date:
+these features are recent), then the **GitHub Copilot** extension from the Extensions view (`Ctrl+Shift+X` /
+`⌘⇧X`), which includes Copilot Chat. Sign in with the GitHub account that has your company's Copilot licence.
+
+**2. Open this folder as the workspace.** *File → Open Folder…* and pick **`snyk-update-package` itself**, not the
+folder above it, or Copilot won't find the commands. If VS Code asks *"Do you trust the authors of the files in this
+folder?"*, choose **Yes, I trust the authors**.
+
+**3. Open the chat** (`Ctrl+Alt+I` on Windows, `⌃⌘I` on macOS, or the chat icon in the title bar), then:
+
+- set the **Session Target** control to **Local**, because the `/dep-*` slash commands only work in Local sessions;
+- in the **Agent** dropdown you can also pick a command's agent directly (e.g. `dep-run`).
+
+**4. Check the commands are there.** Type **`/dep`** in the chat box. You should see all ten:
+
+| Command | What it's for |
+|---------|---------------|
+| `/dep-run <repo>` | **Start here:** runs every step for one repo, stops for your approval |
+| `/dep-login` | Log the Snyk CLI in (browser SSO) |
+| `/dep-upgrade status` | Where every workflow stands |
+| `/dep-clone`, `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-apply`, `/dep-verify`, `/dep-publish` | The steps one by one |
+
+The three helpers (`dependency-analyst`, `upgrade-applier`, `repo-verifier`) are **meant** to be invisible: `/dep-run`
+and the step commands call them by themselves.
+
+**5. First run.**
+
+```text
+/dep-login                       sign in to Snyk once (a browser window opens)
+/dep-run inventory-service       or your own repo: its name in repos/repos.txt, git URL, or a local checkout
+```
+
+- **Copilot asks before it runs a terminal command**, and every step runs the toolkit's scripts. Read the command it
+  shows (it should be one of `toolkit/scripts/…`, `git …`, or a build such as `mvnw`), then allow it.
+- **Buttons under a reply**, e.g. *Approve the plan and continue* or *Next: verify all repos*: clicking one only
+  **fills in** the next prompt. Nothing happens until you press send. Apply and publish never start without you.
+- **On Windows**, Copilot's terminal is PowerShell. The project's instructions tell it to use the `.ps1` scripts and
+  `py -3`, so the commands look different from the macOS ones in this README. That's expected.
+
+**What Copilot picks up by itself from this folder:**
+
+| File | Effect |
+|------|--------|
+| `.github/copilot-instructions.md` | Project rules in every chat: changes only in `repos/<name>/` clones, never publish without you, run the tests |
+| `.github/instructions/maven-dependencies.instructions.md` | Extra rules whenever Copilot edits a `pom.xml` under `repos/` |
+| `.github/skills/dep-upgrade/SKILL.md` | Lets Copilot recognise upgrade requests even without a slash command |
+| `.vscode/settings.json` | Copilot's search skips `target/`, `node_modules/`, `.git/` … |
+
+### If something's missing
+
+| Problem | Fix |
+|---------|-----|
+| `/dep-…` doesn't appear when you type `/` | Check the **Session Target** is **Local**, and that the open folder is `snyk-update-package` (*File → Open Folder*). Then update VS Code and the Copilot extension. If it's still missing, your organisation may have turned off custom prompts or agents: ask your Copilot admin |
+| A command appears **twice** | VS Code also reads the Claude Code versions in `.claude/skills/`. Both do exactly the same; use either |
+| Copilot only answers in text and never runs anything | You're not in an agent session: pick **Agent** (or a `dep-…` agent) in the dropdown, then check terminal commands aren't blocked in your settings |
+| It searches inside `target/` or `node_modules/` | Reload the window (*Developer: Reload Window*) so `.vscode/settings.json` is applied |
+| Commands fail on Windows with bash errors | Copilot ignored the Windows rules: tell it *"use the .ps1 scripts and py -3 (see toolkit/WORKFLOW.md)"* |
+
+VS Code's own guides: [prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) ·
+[custom agents](https://code.visualstudio.com/docs/copilot/customization/custom-agents) ·
+[agent skills](https://code.visualstudio.com/docs/copilot/customization/agent-skills) ·
+[custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions).
 
 ## Logging in to Snyk, step by step
 
@@ -543,7 +613,7 @@ every document must cite `file:line` or a source URL, and why nothing changes yo
 
 | Symptom | Fix |
 |---------|-----|
-| `/dep-*` commands don't appear | Open **this folder** as the workspace root. In Copilot, use **Agent** mode |
+| `/dep-*` commands don't appear | Open **this folder** as the workspace root. In Copilot: Session Target **Local**, see [Setting up GitHub Copilot](#setting-up-github-copilot-vs-code) |
 | Clone fails for a private repo | Your git credentials/SSH key must have access: test with `git clone <url>` |
 | `snyk-scan.sh` exits 127 | No CLI found: set `SNYK_CLI` to the path from the VS Code extension's settings, or install it (see Quick start) |
 | `snyk-scan.sh` exits 126 | Not logged in: run `snyk-login.sh` / `snyk-login.ps1` (or `/dep-login`); a browser opens for your SSO sign-in |
