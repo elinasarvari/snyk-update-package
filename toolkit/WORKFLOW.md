@@ -111,6 +111,11 @@ Each of these appends a timestamped line to the run's **History** and rebuilds `
 - **Documentation is the product.** Each claim cites `repos/<repo>/path:line` or a URL.
   "Checked, not affected" lists are required.
 - **Never hide red.** No skipping tests, `@Disabled`, or `-DskipTests` to get green.
+- **Stay out of build output and dependency folders.** Never search, scan, read for analysis, or edit inside the
+  folders listed in `toolkit/ignore-dirs.txt` (`target/`, `build/`, `out/`, `node_modules/`, `.git/`, IDE folders
+  ...). Use `git -C <repo> grep` / `git ls-files`, which only see tracked files. The scripts already apply the list
+  (Snyk `--exclude`, pom discovery), as do `.vscode/settings.json` and `.claude/settings.json`. The one exception:
+  `verify-repo` reads the build's own results (test reports, the packaged jar).
 - **The clone holds code changes only. Everything else lives in this project.** In `repos/<name>/` the
   workflow may only change what the approved plan says (code, `pom.xml`/build files, config, tests). It
   never writes documentation, reports, logs, notes, Snyk policy files (`.snyk`), helper scripts or anything

@@ -19,6 +19,9 @@ identically and only differ in how they run processes. Python 3.9, stdlib only, 
                                                           arguments passed to other programs)
     script-helpers.py first-errors <log> [max]         -> the first error-looking lines of a build log
     script-helpers.py filter-tree <tree> <out> <word>...-> module headers + lines containing any word
+    script-helpers.py ignore-dirs [--comma]            -> the folders never searched/scanned (toolkit/ignore-dirs.txt)
+    script-helpers.py find-poms                        -> ./paths of every pom.xml in the current folder, skipping
+                                                          the ignored folders, sorted
 """
 import glob
 import json
@@ -33,7 +36,27 @@ for _stream in (sys.stdout, sys.stderr):        # Windows consoles default to a 
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
 NS = {"m": "http://maven.apache.org/POM/4.0.0"}
-IGNORED_BUILD_DIRS = re.compile(r"(^|/)(target|build)/")
+IGNORE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ignore-dirs.txt")
+
+
+def load_ignore_dirs():
+    with open(IGNORE_FILE, encoding="utf-8") as fh:
+        return [l.strip() for l in fh if l.strip() and not l.lstrip().startswith("#")]
+
+
+def ignore_dirs(comma=False):
+    dirs = load_ignore_dirs()
+    print(",".join(dirs) if comma else "\n".join(dirs))
+
+
+def find_poms():
+    skip = set(load_ignore_dirs())
+    found = []
+    for base, dirs, files in os.walk("."):
+        dirs[:] = sorted(d for d in dirs if d not in skip)        # never descend into them
+        if "pom.xml" in files:
+            found.append(os.path.join(base, "pom.xml").replace(os.sep, "/"))
+    print("\n".join(sorted(found)))
 
 
 def run(cmd):
@@ -185,6 +208,7 @@ def main(argv):
         "git-snapshot": lambda: git_snapshot(args[0]), "left-in-repo": lambda: left_in_repo(args[0]),
         "env-info": env_info, "summary": lambda: summary(args[0], args[1:]),
         "first-errors": lambda: first_errors(*args[:2]), "filter-tree": lambda: filter_tree(args[0], args[1], args[2:]),
+        "ignore-dirs": lambda: ignore_dirs("--comma" in args), "find-poms": find_poms,
     }
     if cmd not in table:
         sys.exit("unknown helper %r\n%s" % (cmd, __doc__))

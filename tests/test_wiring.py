@@ -15,7 +15,7 @@ import unittest
 from helpers import ON_WINDOWS, POWERSHELL, PROJECT
 
 PHASES = ["dep-clone", "dep-scan", "dep-inventory", "dep-analyze", "dep-apply", "dep-verify", "dep-publish"]
-COMMANDS = ["dep-upgrade", "dep-run"] + PHASES
+COMMANDS = ["dep-upgrade", "dep-run", "dep-login"] + PHASES
 SUBAGENTS = ["dependency-analyst", "upgrade-applier", "repo-verifier"]
 MANUAL_ONLY = ["dep-apply", "dep-publish", "dep-run"]   # can change code or push: user-started only
 
@@ -71,13 +71,15 @@ class GeneratedFilesAreCurrent(unittest.TestCase):
         try:
             os.makedirs(os.path.join(tmp, "tools"))
             shutil.copy(os.path.join(PROJECT, "tools", "generate-entrypoints.py"), os.path.join(tmp, "tools"))
+            os.makedirs(os.path.join(tmp, "toolkit"))                       # the generator reads the ignore list
+            shutil.copy(os.path.join(PROJECT, "toolkit", "ignore-dirs.txt"), os.path.join(tmp, "toolkit"))
             subprocess.run([sys.executable, "-I", os.path.join(tmp, "tools", "generate-entrypoints.py")],
                            check=True, stdout=subprocess.DEVNULL)
             stale = []
             for base, _dirs, files in os.walk(tmp):
                 for name in files:
                     rel = os.path.relpath(os.path.join(base, name), tmp)
-                    if rel.startswith("tools"):
+                    if rel.startswith(("tools", "toolkit")):
                         continue
                     committed = os.path.join(PROJECT, rel)
                     with open(os.path.join(base, name), encoding="utf-8") as fh:

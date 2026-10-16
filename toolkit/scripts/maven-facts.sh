@@ -65,7 +65,7 @@ fi
 while IFS= read -r pom; do
   py pom-declared "$pom" >> "$out/declared.txt" 2>/dev/null
   py version-props "$pom" >> "$out/version-props.txt" 2>/dev/null
-done < <(find . -name pom.xml -not -path '*/target/*' -not -path '*/node_modules/*' | sort)
+done < <(py find-poms)          # skips target/, node_modules/, .git/ ... (toolkit/ignore-dirs.txt)
 
 cat "$out/facts.env"
 echo "declared deps: $(wc -l < "$out/declared.txt" | tr -d ' ')  tree lines: $(wc -l < "$out/dependency-tree.txt" 2>/dev/null | tr -d ' ')"

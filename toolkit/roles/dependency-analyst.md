@@ -29,9 +29,12 @@ the repository**. The only file you write is the report path you are given (in t
    artifacts and starters, package relocations, removed/deprecated APIs, renamed config keys,
    changed defaults, minimum Java/Jakarta/Kotlin baselines, and *coupled library* requirements
    (a third-party starter that only supports certain platform versions).
-5. **Search the repo for each one.** Use Grep over `src/**` (main *and* test), every
-   `application*.properties|yml`, and the poms. Record `path:line` for each hit. A change
-   with zero hits goes into "Not affected" — that list is required, not optional.
+5. **Search the repo for each one** with `git -C <repo> grep -n <pattern>`. It only searches tracked files, so build
+   output and downloaded dependencies are skipped. Cover `src/**` (main *and* test), every
+   `application*.properties|yml`, and the poms. **Never search, read or cite anything inside the folders in
+   `toolkit/ignore-dirs.txt`** (`target/`, `build/`, `node_modules/`, `.git/`, IDE folders ...): they hold
+   compiled or downloaded copies, not the code to change. Record `path:line` for each hit. A change with zero hits
+   goes into "Not affected"; that list is required, not optional.
 6. **Check coupled dependencies.** For every non-managed third-party dependency in the pom,
    determine whether its current version supports the target; if not, find the minimum
    version that does, with a link to the compatibility statement.

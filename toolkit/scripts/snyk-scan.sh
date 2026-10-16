@@ -11,7 +11,10 @@
 #                                  export SNYK_CLI="/path/shown/in/the/extension/settings/snyk-macos-arm64"
 #   2. `snyk` on your PATH      - brew tap snyk/tap && brew install snyk-cli   (or: npm install -g snyk)
 #   3. common download folders of the Snyk VS Code extension / language server (see find_cli below)
-# Log in once with the same SSO account as the extension:  "$SNYK_CLI" auth  (or: snyk auth), or SNYK_TOKEN.
+# Log in once with the same SSO account as the extension:  bash toolkit/scripts/snyk-login.sh  (OAuth2, opens your browser).
+#
+# Never scans inside the folders in toolkit/ignore-dirs.txt (target/, node_modules/, ...): they are passed to
+# Snyk as --exclude=..., merged with any --exclude=... you give.
 #
 # Outputs in <out-dir>:
 #   <repo-name>.json   raw `snyk test --all-projects --json`
@@ -25,46 +28,34 @@ shift
 manifest_args=()
 if [[ "${1:-}" == "--manifest" || "${1:-}" == "--workflow" ]]; then manifest_args=("$1" "$2"); shift 2; fi
 
-find_cli() {
-  if [[ -n "${SNYK_CLI:-}" ]]; then
-    [[ -x "$SNYK_CLI" && ! -d "$SNYK_CLI" ]] && { echo "$SNYK_CLI"; return 0; }
-    echo "SNYK_CLI is set to '$SNYK_CLI', but that is not an executable file." >&2
-    return 1
-  fi
-  command -v snyk 2>/dev/null && return 0
-  # Where the Snyk VS Code extension / language server usually downloads its CLI. Locations vary by
-  # version and OS - if yours is elsewhere, set SNYK_CLI (the path is in the extension's settings).
-  local c
-  for c in "$HOME/Library/Application Support/snyk/"snyk-macos* \
-           "$HOME/Library/Application Support/Code/User/globalStorage/snyk-security.snyk-vulnerability-scanner/"snyk* \
-           "$HOME/.local/share/snyk/"snyk-linux* \
-           "$HOME/.config/Code/User/globalStorage/snyk-security.snyk-vulnerability-scanner/"snyk*; do
-    [[ -f "$c" && -x "$c" ]] && { echo "$c"; return 0; }
-  done
-  return 1
-}
+# shellcheck source=snyk-common.sh
+. "$(dirname "$0")/snyk-common.sh"
 
 if ! snyk_bin=$(find_cli); then
-  cat >&2 <<'MSG'
-Snyk CLI not found. Any one of these works:
-  - Use the CLI your Snyk VS Code extension already downloaded (its path is in the extension's settings):
-      export SNYK_CLI="/path/to/snyk-macos-arm64"
-  - Install it:   brew tap snyk/tap && brew install snyk-cli     (or: npm install -g snyk)
-Then log in once with the same SSO account:  "$SNYK_CLI" auth   (or: snyk auth)
-Or export `snyk test --all-projects --json` from CI and pass the file to parse-snyk.py instead.
-MSG
+  cli_missing_help
   exit 127
 fi
 echo "Using Snyk CLI: $snyk_bin" >&2
-# `whoami` works for both kinds of login: a token (snyk config / SNYK_TOKEN) and browser/SSO (OAuth).
-if [[ -z "${SNYK_TOKEN:-}" ]] && ! "$snyk_bin" whoami --experimental >/dev/null 2>&1; then
-  echo "Snyk is not logged in - run: \"$snyk_bin\" auth   (opens your browser for SSO), or export SNYK_TOKEN." >&2
+# Works for every kind of login: browser/SSO (OAuth), service-account client credentials, API token.
+if ! snyk_logged_in; then
+  echo "Snyk is not logged in - run: bash toolkit/scripts/snyk-login.sh   (opens your browser for SSO)" >&2
   exit 126
 fi
 
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
 printf 'repo\tpath\texit\tmeaning\n' > "$out/scan-index.tsv"
+
+# Build output and dependency folders are never scanned: merge them into one --exclude=...
+exclude=$(python3 -I "$here/script-helpers.py" ignore-dirs --comma)
+snyk_args=()
+for arg in "$@"; do
+  case "$arg" in
+    --exclude=*) exclude="${arg#--exclude=},$exclude" ;;
+    *) snyk_args+=("$arg") ;;
+  esac
+done
+snyk_args+=("--exclude=$exclude")
 
 # ${arr[@]+...} form: bash 3.2 (macOS) treats an empty array as unbound under `set -u`.
 repos=$(python3 -I "$here/repos.py" ${manifest_args[@]+"${manifest_args[@]}"} list) || exit 2
@@ -77,7 +68,7 @@ while IFS=$'\t' read -r name dir _rest; do
   fi
   echo "SCAN $name ($dir)" >&2
   # --all-projects picks up every pom/gradle file under the path (multi-module included).
-  (cd "$dir" && "$snyk_bin" test --all-projects --json "$@") > "$out/$name.json" 2> "$out/$name.err"
+  (cd "$dir" && "$snyk_bin" test --all-projects --json "${snyk_args[@]}") > "$out/$name.json" 2> "$out/$name.err"
   code=$?
   case $code in
     0) meaning="no vulnerabilities" ;;

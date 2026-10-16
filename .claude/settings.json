@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./repos/**/target/**)",
+      "Edit(./repos/**/target/**)",
+      "Read(./repos/**/build/**)",
+      "Edit(./repos/**/build/**)",
+      "Read(./repos/**/out/**)",
+      "Edit(./repos/**/out/**)",
+      "Read(./repos/**/bin/**)",
+      "Edit(./repos/**/bin/**)",
+      "Read(./repos/**/dist/**)",
+      "Edit(./repos/**/dist/**)",
+      "Read(./repos/**/node_modules/**)",
+      "Edit(./repos/**/node_modules/**)",
+      "Read(./repos/**/.gradle/**)",
+      "Edit(./repos/**/.gradle/**)",
+      "Read(./repos/**/.idea/**)",
+      "Edit(./repos/**/.idea/**)",
+      "Read(./repos/**/.git/**)",
+      "Edit(./repos/**/.git/**)",
+      "Read(./repos/**/coverage/**)",
+      "Edit(./repos/**/coverage/**)",
+      "Read(./repos/**/.venv/**)",
+      "Edit(./repos/**/.venv/**)",
+      "Read(./repos/**/__pycache__/**)",
+      "Edit(./repos/**/__pycache__/**)"
+    ]
+  }
+}

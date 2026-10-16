@@ -54,10 +54,30 @@ changing any system setting. Each bash script `x.sh` has a PowerShell twin `x.ps
 | **The Snyk VS Code extension** (it already downloaded the CLI; the path is in its settings: Snyk → Advanced → CLI path) | `export SNYK_CLI="<that path>"` (add it to `~/.zshrc`) | `$env:SNYK_CLI = "<that path>"`, or to keep it: `[Environment]::SetEnvironmentVariable("SNYK_CLI", "<that path>", "User")` |
 | Nothing yet | `brew tap snyk/tap && brew install snyk-cli` | `npm install -g snyk` (or download `snyk-win.exe` from Snyk's releases) |
 
-Common download locations of the extension's CLI are also found automatically. Then log in **with the same SSO
-account as the extension**: `"$SNYK_CLI" auth` on macOS, `& $env:SNYK_CLI auth` on Windows (or just `snyk auth`).
-It opens your browser for the SSO sign-in; nothing is read from the extension. Check with `whoami --experimental`.
-No CLI allowed where you are? Pass a Snyk JSON export to `/dep-scan` or `/dep-run` instead.
+Common download locations of the extension's CLI are also found automatically.
+
+**Log the CLI in (once), with OAuth2 and your company SSO.** No clicking "Authenticate" in the extension; the
+toolkit starts the login and **your browser opens by itself**:
+
+| | macOS | Windows (PowerShell) |
+|---|---|---|
+| Log in (browser, SSO) | `bash toolkit/scripts/snyk-login.sh` | `powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-login.ps1` |
+| Am I logged in? | `bash toolkit/scripts/snyk-login.sh --status` | `... snyk-login.ps1 --status` |
+| Log out | `bash toolkit/scripts/snyk-login.sh --logout` | `... snyk-login.ps1 --logout` |
+
+Or in chat: **`/dep-login`**. You rarely need any of these: if a scan finds the CLI isn't logged in, `/dep-scan`
+and `/dep-run` start the login themselves and retry. You only sign in in the browser window that opens.
+
+- **How it works:** it runs the CLI's own OAuth2 login (`snyk auth --auth-type=oauth`; OAuth is the CLI's default
+  since 1.1293). The CLI stores a token that renews itself, so you sign in once, not per scan. The extension keeps its
+  own login inside VS Code, which is why the CLI needs this one-time sign-in of its own.
+- **No browser (automation / build machine):** with a Snyk *service account* (Enterprise plan), set
+  `SNYK_CLIENT_ID` and `SNYK_CLIENT_SECRET` (`$env:…` on Windows) and run the same script. It uses the OAuth2
+  *client credentials* grant instead, with no browser. The secret is only read from the environment and never
+  printed or saved.
+- **Snyk in another region (EU / AU) or a private instance:** add `--endpoint <url>` once, e.g.
+  `--endpoint https://api.eu.snyk.io`. Get the exact URL from your Snyk admin.
+- **No CLI allowed where you are?** Pass a Snyk JSON export to `/dep-scan` or `/dep-run` instead.
 
 **2. List the repos you want to fix** in [`repos/repos.txt`](repos/repos.txt), one line each (or skip this:
 `/dep-run <git-url>` adds the line for you):
@@ -196,6 +216,10 @@ workflows/wf-001-spring-boot-4-1/
 | `toolkit/scripts/workflows.py` | Workflow ids: new run, resolve `1`→folder, step states, history, index | — |
 | `toolkit/scripts/*.ps1`, `common.ps1` | PowerShell twins of the `.sh` scripts (Windows PowerShell 5.1 and 7), same arguments and outputs | when you change its `.sh` twin |
 | `toolkit/scripts/script-helpers.py` | Parsing shared by the bash and PowerShell scripts (JUnit, pom.xml, summary.json) | — |
+| `toolkit/scripts/snyk-login.sh` / `.ps1`, `snyk-common.sh` / `.ps1` | OAuth2 login for the Snyk CLI (browser SSO or service account), and the CLI lookup shared with the scan | — |
+| `toolkit/LOGIN.md` | What `/dep-login` does (and what `/dep-scan` / `/dep-run` do when the CLI isn't logged in) | to change behaviour |
+| `toolkit/ignore-dirs.txt` | Folders never searched, scanned or edited in a repo: `target/`, `build/`, `node_modules/`, `.git/`, IDE folders … | to add a folder (then re-run the generator) |
+| `.vscode/settings.json`, `.claude/settings.json` | Keep Copilot's search and Claude's reads/edits out of those folders (**generated** from `ignore-dirs.txt`) | no, regenerate |
 | `toolkit/scripts/snyk-scan.sh` | Snyk scan of every repo in the list | — |
 | `toolkit/scripts/parse-snyk.py` | Snyk JSON → findings tables + CSV | — |
 | `toolkit/scripts/maven-facts.sh` | What a repo's pom really resolves | — |
@@ -327,6 +351,8 @@ You still see the output on screen, and `test-results.txt` holds a copy (it isn'
 | `test_snyk.py` | Every flagged package listed once with all its paths, severity totals, grouping by the dependency you edit, licence/no-fix rows, CSV. **Both scan scripts** handle a missing or not-logged-in CLI, `SNYK_CLI`, the VS Code extension's CLI and SSO logins, and scan each clone (or one workflow's repos) |
 | `test_build_scripts.py` | **Both versions** of verify-repo and maven-facts: build results from JUnit files, failing tests named, build tool auto-detected (`mvnw` / `mvnw.cmd`), smoke boot catches "APPLICATION FAILED TO START", nothing left in the repo, Maven facts right |
 | `test_clone_hygiene.py` | End to end, with bash and with PowerShell: clone → scan → build leaves the clone with **no changed files and no commits**; all evidence lands in `workflows/<id>/` |
+| `test_ignore_dirs.py` | `target/`, `node_modules/`, `.git/` … are skipped by both shells' Snyk scan and pom discovery, don't count as uncommitted work, and are excluded in the Copilot and Claude settings |
+| `test_snyk_login.py` | **Both login scripts:** browser OAuth2 when logged out, nothing when already logged in, service-account client credentials **without ever printing or saving the secret**, `--status`, `--logout`, `--endpoint`, failed logins, and that a scan without a login points to it |
 | `test_wiring.py` | Every `/dep-*` command exists for Copilot **and** Claude and points at files that exist. Every `.sh` has a `.ps1` twin with the same options, every `.ps1` parses and avoids PowerShell-7-only syntax. **`/dep-apply`, `/dep-publish` and `/dep-run` can only be started by you**, and the approval gate is in place |
 
 What tests can't check is the AI's judgement inside a step, e.g. how good an impact analysis is. That's why
@@ -334,6 +360,9 @@ every document must cite `file:line` or a source URL, and why nothing changes yo
 
 ## Guard rails
 
+- **Never into build output or dependencies.** `target/`, `build/`, `node_modules/`, `.git/`, IDE folders and the rest of
+  [`toolkit/ignore-dirs.txt`](toolkit/ignore-dirs.txt) are skipped by the Snyk scan (`--exclude`), by pom discovery, by
+  Copilot's search and by Claude's read/edit permissions, and the assistants search with `git grep` (tracked files only).
 - **Read-only until you approve.** Clone, scan, inventory, analyze and verify never edit your code.
 - **Approval is yours.** The plan's approval box is ticked only after you approve in chat.
 - **Branches, not main.** Changes go to `deps/<id>` in the clone under `repos/`. Nothing is committed until `/dep-publish`.
@@ -350,7 +379,8 @@ every document must cite `file:line` or a source URL, and why nothing changes yo
 | `/dep-*` commands don't appear | Open **this folder** as the workspace root. In Copilot, use **Agent** mode |
 | Clone fails for a private repo | Your git credentials/SSH key must have access: test with `git clone <url>` |
 | `snyk-scan.sh` exits 127 | No CLI found: set `SNYK_CLI` to the path from the VS Code extension's settings, or install it (see Quick start) |
-| `snyk-scan.sh` exits 126 | Not logged in: `"$SNYK_CLI" auth` (browser SSO) or `SNYK_TOKEN` |
+| `snyk-scan.sh` exits 126 | Not logged in: run `snyk-login.sh` / `snyk-login.ps1` (or `/dep-login`); a browser opens for your SSO sign-in |
+| The login says "did not complete" | Sign-in was cancelled or SSO isn't enabled for you: run it again, or ask your Snyk admin |
 | The scan uses a different CLI than expected | It prints `Using Snyk CLI: <path>`. `SNYK_CLI` always wins over `snyk` on your PATH |
 | Snyk reports a different version than the inventory | Expected when the scan ran on another branch. See *Discrepancies* in `02-inventory.md` |
 | `/dep-clone` says "kept as is" or "expected main" | That repo has local changes or is on another branch. That's intentional: switch or commit yourself if needed |

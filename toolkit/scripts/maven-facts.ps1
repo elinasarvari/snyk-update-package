@@ -70,9 +70,8 @@ $declared = Join-Path $out 'declared.txt'
 $props = Join-Path $out 'version-props.txt'
 Write-Utf8File $declared ''
 Write-Utf8File $props ''
-$poms = Get-ChildItem -Path . -Recurse -Filter 'pom.xml' -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '[\\/](target|node_modules)[\\/]' } |
-    ForEach-Object { './' + $_.FullName.Substring($repo.Length).TrimStart('\', '/').Replace('\', '/') } | Sort-Object
+# skips target/, node_modules/, .git/ ... (toolkit/ignore-dirs.txt)
+$poms = @(Invoke-Helper @('find-poms') | Where-Object { $_ })
 foreach ($pom in $poms) {
     foreach ($line in @(Invoke-Helper @('pom-declared', $pom) 2>$null)) { Add-Utf8Line $declared $line }
     foreach ($line in @(Invoke-Helper @('version-props', $pom) 2>$null)) { Add-Utf8Line $props $line }

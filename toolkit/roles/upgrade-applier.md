@@ -43,6 +43,10 @@ and where it stopped if it did not finish.
 
 ## Never
 
+- Edit, create or delete anything inside the folders in `toolkit/ignore-dirs.txt` (`target/`, `build/`,
+  `node_modules/`, `.git/`, IDE folders ...). They're build output or dependencies; fix the source instead.
+  Find files with `git -C <repo> grep` / `git ls-files`, which skip them.
+
 - Write anything into the repo that isn't a change from the plan: no logs, notes, reports, TODO files,
   `.snyk` files or scripts. Your log goes to the `log` path you were given (in the snyk-update-package project).
 

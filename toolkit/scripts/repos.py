@@ -50,6 +50,11 @@ DEFAULT_BASE = "main"
 RESERVED_NAMES = ("repos.txt", "README.md")            # files kept next to the clones
 KNOWN_KEYS = ("branch", "path", "smoke", "build")
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+# Folders never searched, scanned or counted as changes (build output, dependencies, IDE files).
+with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ignore-dirs.txt"),
+          encoding="utf-8") as _fh:
+    IGNORE_DIRS = [l.strip() for l in _fh if l.strip() and not l.lstrip().startswith("#")]
+IGNORED_PATH = re.compile(r"(^|/)(%s)(/|$)" % "|".join(re.escape(d) for d in IGNORE_DIRS))
 
 
 def git(args, cwd=None):
@@ -212,7 +217,7 @@ def repo_state(repo):
     _, branch = git(["rev-parse", "--abbrev-ref", "HEAD"], d)
     _, commit = git(["rev-parse", "--short", "HEAD"], d)
     _, dirty = git(["status", "--porcelain", "--untracked-files=normal"], d)
-    dirty_files = [l for l in dirty.splitlines() if l and not re.search(r"(^|/)(target|build)/", l)]
+    dirty_files = [l for l in dirty.splitlines() if l and not IGNORED_PATH.search(l[3:].strip('"'))]
     code, counts = git(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], d)
     behind, ahead = counts.split() if code == 0 else ("-", "-")
     return {"cloned": True, "branch": branch, "commit": commit, "dirty": len(dirty_files),

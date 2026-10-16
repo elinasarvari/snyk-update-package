@@ -1,0 +1,18 @@
+# Folders the toolkit and the assistants never search, scan or edit inside a repo.
+# They hold build output, downloaded dependencies, IDE files or git internals - never the code to fix.
+# One folder name per line. Used by: snyk-scan (--exclude), maven-facts (pom discovery), repos.py (changed-file
+# checks), .vscode/settings.json (Copilot search) and .claude/settings.json (Claude read/edit) - the tests keep
+# those in sync with this list.
+# Exception: verify-repo reads the build's own results in target/ and build/ (test reports, the packaged jar).
+target
+build
+out
+bin
+dist
+node_modules
+.gradle
+.idea
+.git
+coverage
+.venv
+__pycache__
