@@ -155,7 +155,8 @@ and where it stands, open [`workflows/INDEX.md`](workflows/INDEX.md) or run **`/
 
 ## Logging in to Snyk, step by step
 
-You do this **once per machine**. It's the same company SSO login as the VS Code extension's "Authenticate"
+You do this **once per machine**. Windows users: the steps written out for PowerShell are in
+**[On Windows, step by step](#on-windows-step-by-step)**. It's the same company SSO login as the VS Code extension's "Authenticate"
 button, started from the toolkit, with your browser doing the sign-in. No client ID or secret needed.
 
 **1. Make the Snyk CLI available** (skip this if `snyk --version` already works).
@@ -207,6 +208,91 @@ powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-login.ps1 --status
 
 That's it. The CLI keeps a token that renews itself, so scans just work from now on. You only sign in again after
 `--logout`, or if your company's SSO policy ends the session.
+
+### On Windows, step by step
+
+The same login, written out for **Windows PowerShell** (built into Windows; PowerShell 7 works the same).
+Run everything from the `snyk-update-package` folder.
+
+**1. Open PowerShell in the project folder.** Start menu → *Windows PowerShell* (or Windows Terminal), then:
+
+```powershell
+cd $HOME\snyk-update-package          # wherever you cloned it
+```
+
+In VS Code, the built-in terminal (`` Ctrl+` ``) is PowerShell by default and opens in the project folder.
+
+**2. Check whether a Snyk CLI is already there:**
+
+```powershell
+Get-Command snyk -ErrorAction SilentlyContinue
+```
+
+- **It prints a path:** skip to step 4.
+- **Nothing printed, but you use the Snyk VS Code extension:** go to step 3a. The extension has already downloaded a CLI.
+- **Nothing printed, no extension:** go to step 3b.
+
+**3a. Point the toolkit at the extension's CLI.** In VS Code: *File → Preferences → Settings*, search for
+**`snyk cli path`**, and copy the path shown (it ends in `.exe`, e.g. `...\snyk-win.exe`). Then save it for your
+user, so every new window has it:
+
+```powershell
+[Environment]::SetEnvironmentVariable("SNYK_CLI", "C:\path\from\settings\snyk-win.exe", "User")
+$env:SNYK_CLI = [Environment]::GetEnvironmentVariable("SNYK_CLI", "User")   # also use it in this window
+Test-Path $env:SNYK_CLI                                                      # must print True
+```
+
+Keep the quotes: the path often contains spaces. **Restart VS Code** afterwards so its terminals and Copilot see the
+new variable. The usual download folders under `%LOCALAPPDATA%` and `%APPDATA%` are also searched automatically,
+so this step is sometimes not needed. The login script prints `Using Snyk CLI: …` either way.
+
+**3b. Or install the CLI** (needs Node.js: `winget install OpenJS.NodeJS.LTS`, then a new PowerShell window):
+
+```powershell
+npm install -g snyk
+snyk --version
+```
+
+**4. Start the login:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-login.ps1
+```
+
+`-ExecutionPolicy Bypass` allows just this script to run, without changing any Windows setting. You'll see:
+
+```text
+Using Snyk CLI: C:\...\snyk-win.exe
+Opening your browser for the Snyk login (OAuth2). Sign in with your company SSO, then come back here.
+If no browser opens, copy the link the Snyk CLI prints below into your browser.
+```
+
+**5. Sign in, in the browser that opens** (your default browser, e.g. Edge). Choose your company's SSO option on
+the Snyk page and sign in as usual, with MFA if your company uses it. When the page says you're signed in, close the
+tab and go back to PowerShell. It finishes with:
+
+```text
+Logged in to Snyk as you@company.com
+```
+
+**6. Check it any time:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File toolkit\scripts\snyk-login.ps1 --status
+```
+
+You're done. Scans (`/dep-scan`, `/dep-run`, or `snyk-scan.ps1`) now use this login, and the CLI renews it by itself.
+
+| Windows problem | Fix |
+|-----------------|-----|
+| `... cannot be loaded because running scripts is disabled on this system` | You ran `.\toolkit\scripts\snyk-login.ps1` directly. Use the `powershell -ExecutionPolicy Bypass -File ...` form from step 4 |
+| `Snyk CLI not found` right after step 3a or 3b | The window was opened before the change. Open a **new** PowerShell window, or restart VS Code |
+| `SNYK_CLI is set to '...', but that is not an executable file` | The path is wrong or missing its quotes. Run `Test-Path $env:SNYK_CLI` and redo step 3a |
+| `npm : The term 'npm' is not recognized` | Install Node.js (step 3b), then open a new window |
+| Windows / your antivirus blocks `snyk-win.exe` | Use the CLI the VS Code extension downloaded (step 3a), or ask IT to allow the Snyk CLI |
+| The browser opens but the sign-in page won't load | Your company network may need a proxy. Set it for this window (`$env:HTTPS_PROXY = "http://proxy:port"`, ask IT for the address), then step 4 again |
+| `Note: SNYK_TOKEN / SNYK_OAUTH_TOKEN is set in this shell, Snyk rejects it, ...` | `Remove-Item Env:SNYK_TOKEN, Env:SNYK_OAUTH_TOKEN -ErrorAction SilentlyContinue`, and remove it from your user variables too, then step 4 |
+| `Snyk login did not complete. ...` | Run step 4 again. If it keeps failing, ask your Snyk admin to check that SSO login is enabled for you |
 
 ### What the messages mean
 
