@@ -157,20 +157,72 @@ and where it stands, open [`workflows/INDEX.md`](workflows/INDEX.md) or run **`/
 
 ---
 
-## Saving workflow records to GitHub
+## Saving workflow results into the repository
 
-Every workflow's folder (`workflows/wf-NNN-<repo>/`), the index and the research cache are **committed and pushed to
-this repository**, so the documentation is on GitHub and on every machine that pulls it.
+Every workflow's results (its folder `workflows/wf-NNN-<repo>/`, plus `workflows/INDEX.md` and the research cache)
+are **saved into this repository**: committed, then pushed to its online copy so your other machines get them too.
+That's how the documentation of every upgrade lives in `snyk-update-package`, not only on one computer.
 
-- **Automatic:** `/dep-run` and every step save when they finish or stop. To save by hand: **`/dep-save <id>`**, or
-  `python3 -I toolkit/scripts/workflows.py save <id>` (Windows: `py -3 -I toolkit\scripts\workflows.py save <id>`).
-- **Only the records:** it commits that workflow's files and nothing else, so other changes you have in this repo are
-  left alone. Raw Snyk JSON, logs and error files are never committed; the documents summarise them.
-- **Several machines:** a new workflow first pulls what was pushed elsewhere, so the numbers don't clash, and a save
-  rebases onto newer records before pushing.
-- **Keep this repository private.** The records name your repos and list their open vulnerabilities, so **saving
-  refuses while the repository is public**. Make it private on GitHub: *Settings → General → Danger Zone → Change
-  visibility*. Only if publishing really is intended: `save <id> --allow-public`.
+**What gets saved:** `STATUS.md`, `01-snyk-findings.md` … `06-publish.md`, `findings.md` / `.csv` / `.json`, the
+analysis files, and the verification summaries. **What doesn't:** raw Snyk JSON, logs and error files (the
+documents summarise them), the repo clones in `repos/`, and your personal settings.
+
+### Step by step
+
+**1. One-time: make this repository private.** The results name your repos and list their open vulnerabilities,
+so saving **refuses to push while the repository is public**. On GitHub, open `snyk-update-package` →
+**Settings** → **General** → scroll to **Danger Zone** → **Change visibility** → **Make private**. Only people you
+invite (Settings → Collaborators) can then see it.
+
+**2. Run your workflow as usual.** `/dep-run <repo>` and every step **save by themselves** when they finish or stop
+for you. There's nothing extra to do.
+
+**3. Save by hand when you want to** (for example after editing a document, or for a workflow from before saving existed):
+
+```text
+/dep-save 1                                                        in Copilot or Claude chat (1 = Workflow 1, wf-001)
+```
+
+```bash
+python3 -I toolkit/scripts/workflows.py save 1                     # macOS
+```
+
+```powershell
+py -3 -I toolkit\scripts\workflows.py save 1                       # Windows
+```
+
+**4. Check the result.** A successful save prints:
+
+```text
+committed 9 file(s) for wf-001
+pushed workflows/wf-001-inventory-service to https://github.com/<you>/snyk-update-package.git
+```
+
+**5. Read the documentation.** On GitHub: `workflows/INDEX.md` lists every workflow, and each workflow's `STATUS.md`
+links to its documents. On another machine: `git pull` in `snyk-update-package`. New workflows pull first by
+themselves, so their numbers never clash with ones saved elsewhere.
+
+### What the messages mean
+
+| You see | Meaning | What to do |
+|---------|---------|------------|
+| `committed N file(s) for wf-NNN` then `pushed …` | Saved and pushed | Nothing |
+| `wf-NNN: nothing new to commit` | No changes since the last save; anything not yet pushed is pushed | Nothing |
+| `REFUSED: this repository is PUBLIC, …` | Nothing was committed or pushed | Step 1, then save again. Only if publishing really is intended: add `--allow-public` |
+| `Note: couldn't check whether the repository is public …` | Offline, or the repo isn't on GitHub. It saves anyway | Make sure the repository is private |
+| `could not sync with origin automatically …` | Someone pushed changes that conflict with yours (not just the index, which is fixed automatically) | Resolve it with `git pull --rebase` in `snyk-update-package`, then save again |
+| `push failed: …` | No access to the online repo, or no network. The commit is kept locally | Fix access/network, then save again (it pushes what's waiting) |
+| `this project has no git remote 'origin' …` | This copy isn't connected to an online repository | Clone it from GitHub, or save with `--no-push` to only commit |
+
+### Options
+
+| Option | Effect |
+|--------|--------|
+| `--no-push` | Commit into the repository only. Push later with `git push`, or by saving again without the option |
+| `--allow-public` | Push even though the repository is public. Not recommended for real company repos |
+
+**Your other changes are safe:** a save commits only that workflow's records. Anything else you've changed in
+`snyk-update-package` stays uncommitted, exactly as it was. And it never force-pushes.
 
 ## Setting up GitHub Copilot (VS Code)
 
@@ -754,7 +806,7 @@ every document must cite `file:line` or a source URL, and why nothing changes yo
 | The scan uses a different CLI than expected | It prints `Using Snyk CLI: <path>`. `SNYK_CLI` always wins over `snyk` on your PATH |
 | Snyk reports a different version than the inventory | Expected when the scan ran on another branch. See *Discrepancies* in `02-inventory.md` |
 | `/dep-clone` says "kept as is" or "expected main" | That repo has local changes or is on another branch. That's intentional: switch or commit yourself if needed |
-| `save` says `REFUSED: this repository is PUBLIC` | Make the repo private on GitHub (*Settings → General → Danger Zone → Change visibility*), then `/dep-save <id>` again |
+| `save` says `REFUSED: this repository is PUBLIC` (see [Saving workflow results](#saving-workflow-results-into-the-repository)) | Make the repo private on GitHub (*Settings → General → Danger Zone → Change visibility*), then `/dep-save <id>` again |
 | `/dep-run` or `/dep-clone` says BLOCKED | Another workflow's changes in that clone aren't published yet. Publish or abandon that workflow, then run again |
 | Build red only when repos build in parallel | Shared `~/.m2` download clash. Re-run that repo: `/dep-verify <id> <repo>` |
 | `/dep-publish` stops | `gh auth status` must pass. For Bitbucket/GitLab it pushes and gives you the PR link instead |
