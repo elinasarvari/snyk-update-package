@@ -222,6 +222,77 @@ py -3 -I toolkit\scripts\parse-snyk.py "workflows\wf-001-<repo>\snyk\*.json" --i
 **Is every module decided?** `python3 -I toolkit/scripts/script-helpers.py plan-check workflows/wf-001-<repo>/03-plan.md`
 lists any module with an open field. `/dep-run` only asks you to approve once this says *"all N modules decided"*.
 
+## How the plan is built (fast), step by step
+
+The planning step (`/dep-analyze`, or step 3 of `/dep-run`) does most of its work with scripts, so it's quick and
+doesn't spend tokens re-typing tables. You don't have to run anything here; the assistant does. The commands are
+shown so you can follow along, or adjust decisions yourself.
+
+**1. The scan writes three summaries** in `workflows/wf-NNN-<repo>/snyk/`:
+
+| File | What it is | Who reads it |
+|------|------------|--------------|
+| `findings.md` | Every flagged package, the changes to make, every dependency path | You; the assistant reads only section 2 |
+| `vulnerable-modules.md` | Every vulnerable module, itemized: facts, issues, paths, decision | Goes into the plan (step 2) |
+| `module-index.md` | **One line per module**: severity, status, Snyk's fix | The assistant, instead of every full entry |
+
+**2. A script puts the modules into the plan.** Every module from the scan lands in `03-plan.md` → *Vulnerable
+modules*, so none can be missed. Snyk's own answer is already filled in: **Fix chosen** (Snyk's fix for each path)
+and **Verified by** (the re-scan must show these issues gone).
+
+```bash
+python3 -I toolkit/scripts/parse-snyk.py "workflows/wf-001-<repo>/snyk/*.json" --into-plan workflows/wf-001-<repo>/03-plan.md   # macOS
+```
+
+```powershell
+py -3 -I toolkit\scripts\parse-snyk.py "workflows\wf-001-<repo>\snyk\*.json" --into-plan workflows\wf-001-<repo>\03-plan.md   # Windows
+```
+
+It prints `put 30 vulnerable modules into …/03-plan.md (0 filled-in decision fields kept)`. Run it again any time,
+e.g. after changing the scope: it refreshes the facts and **keeps every decision field already filled in**.
+
+**3. The assistant reads the index, not every module.** It opens a module's full entry only for the ones that need
+thought: status `needs an override`, `partly fixable` or `no fix`.
+
+**4. Decisions are set for groups of modules at once.** Most modules share a decision, e.g. everything fixed by one
+upgrade gets the same plan step and risk note:
+
+```bash
+python3 -I toolkit/scripts/script-helpers.py plan-decide workflows/wf-001-<repo>/03-plan.md 1-12 "Plan step(s)=Step 1" "Compatibility / risk=see 03-impact.md: Spring Boot 3.5"
+python3 -I toolkit/scripts/script-helpers.py plan-decide workflows/wf-001-<repo>/03-plan.md all "In scope?=yes"
+python3 -I toolkit/scripts/script-helpers.py plan-decide workflows/wf-001-<repo>/03-plan.md "status:no fix" "In scope?=no, see Out of scope #1"
+```
+
+On Windows: `py -3 -I toolkit\scripts\script-helpers.py plan-decide …` with the same arguments.
+
+| Part | Means |
+|------|-------|
+| `1-12`, `3,5,7`, `all` | which modules, by their number in the plan |
+| `"status:needs an override"` | every module with that status: `fixable by upgrade`, `needs an override`, `partly fixable`, `no fix` |
+| `"Field=value"` | one or more of `In scope?`, `Fix chosen`, `Target version`, `Plan step(s)`, `Compatibility / risk`, `Verified by` |
+
+It prints `set Plan step(s), Compatibility / risk for 12 module(s): 1, 2, …`.
+
+**5. A check by code that nothing is left open:**
+
+```bash
+python3 -I toolkit/scripts/script-helpers.py plan-check workflows/wf-001-<repo>/03-plan.md            # macOS
+```
+
+```powershell
+py -3 -I toolkit\scripts\script-helpers.py plan-check workflows\wf-001-<repo>\03-plan.md             # Windows
+```
+
+| It prints | Meaning |
+|-----------|---------|
+| `all 30 modules decided` | Every module has a full decision. Only now does `/dep-run` ask you to approve |
+| `2 of 30 modules still have open decisions:` and a list like `7. org.foo:bar@1.0: Target version, Plan step(s)` | Those fields are still open; the assistant fills them before asking you |
+
+**6. You review and approve:** see [Reviewing the plan](#reviewing-the-plan-vulnerable-modules-step-by-step).
+
+**Changing a decision yourself:** edit the row in `03-plan.md`, or use `plan-decide` as above, e.g.
+`plan-decide … 7 "Target version=2.2"`. Re-running step 2 keeps your edit.
+
 ## Saving workflow results into the repository
 
 Every workflow's results (its folder `workflows/wf-NNN-<repo>/`, plus `workflows/INDEX.md` and the research cache)
@@ -625,6 +696,9 @@ The toolkit is set up to keep the assistants' context small, and you can help.
 - **Searches skip `target/`, `node_modules/`, `.git/` …**, and the assistants find code with `git grep`.
 - **The verify helper runs on a smaller model** (Claude: Haiku). It only runs a script and reads a summary.
 - **State lives in files** (`STATUS.md` and the numbered documents), so no step needs the earlier conversation.
+- **The plan is built by script:** the modules are inserted and pre-filled from Snyk, the assistant reads a
+  one-line-per-module index, sets decisions for groups at once, and `plan-check` confirms nothing is open
+  ([how](#how-the-plan-is-built-fast-step-by-step)).
 
 **Habits that help:**
 
