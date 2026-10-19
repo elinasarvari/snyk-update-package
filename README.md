@@ -129,7 +129,7 @@ itself**: clone → Snyk scan → inventory → impact + plan. It **stops only w
 
 | It stops when | You reply / run |
 |---------------|-----------------|
-| the plan is ready (always) | read `workflows/wf-NNN-…/03-plan.md`, then `/dep-run inventory-service approve`, or the *Approve* button in Copilot. It then applies and verifies |
+| the plan is ready (always) | read `workflows/wf-NNN-…/03-plan.md` ([how](#reviewing-the-plan-vulnerable-modules-step-by-step)), then `/dep-run inventory-service approve`, or the *Approve* button in Copilot. It then applies and verifies |
 | verification finished (always) | green: `/dep-publish wf-NNN` to push and open the PR (always your own command). Red: it lists the fixes |
 | something blocks it | what it asks for, e.g. install Snyk, pick the starting version, commit your local changes |
 
@@ -156,6 +156,66 @@ and where it stands, open [`workflows/INDEX.md`](workflows/INDEX.md) or run **`/
 **6. Read the results** in `workflows/<id>/`. Start with `STATUS.md`.
 
 ---
+
+## Reviewing the plan: vulnerable modules, step by step
+
+When `/dep-run` stops with *"review 03-plan.md, reply approve"*, this is how to read the plan. Its **Vulnerable
+modules** section lists every vulnerable module from the Snyk scan, itemized, so you can check each one before
+anything changes in your code.
+
+**1. Open the plan:** `workflows/wf-NNN-<repo>/03-plan.md`. Each module has four parts:
+
+```text
+### 1. org.yaml:snakeyaml@1.33
+
+Facts      current version · highest severity · status · fixed in · number of dependency paths · introduced via · projects
+Issues     one row per Snyk issue: Snyk ID (links to Snyk's page) · title · severity · CVSS · CVE · CWE · exploit · fixed in
+Paths      one row per dependency path the module arrives by, with Snyk's fix for that path
+Decision   in scope? · fix chosen · target version · plan step(s) · compatibility / risk · how it's verified
+```
+
+**2. Check the facts and issues.** These come straight from Snyk, so you're checking they look right, not editing them.
+
+| Column | What it tells you |
+|--------|-------------------|
+| **Status** | `fixable by upgrade`: upgrading the library that brings it in fixes every path · `needs an override`: at least one path has no upgrade, so the module itself must be forced to the fixed version · `partly fixable`: some path has no fix at all · `no fix`: no fixed version exists |
+| **CVSS** | Severity score from 0 to 10 (9+ critical, 7+ high) |
+| **Exploit** | Whether attackers have working code for it, e.g. `Mature`, `Proof of Concept`, `No Known Exploit`. Mature or proof-of-concept first |
+| **Fixed in** | The first versions without the vulnerability |
+| **Paths** | Every route into your build, e.g. `your-app › A@1.0 › B@2.1 › module@1.33`. **A module is only fixed when every path is** |
+
+**3. Check each decision.** The decision table is the assistant's proposal. Look for these, module by module:
+
+| Look at | It's right when |
+|---------|-----------------|
+| **Fix chosen** | Follows the order: upgrade the library that brings it in → **override** the module to the fixed version → a newer introducing library or excluding the module → only then *out of scope* |
+| **Target version** | At or above the *Fixed in* version |
+| **Plan step(s)** | Names the steps that cover **every** path listed. Cross-check with the plan's *Path coverage* table |
+| **Compatibility / risk** | Says what could break, with evidence from `03-impact.md`, not just "low risk" |
+| **In scope? = no** | Points to a row in *Out of scope* that says why and what happens next |
+
+**4. Check nothing is missing.** The number of module entries should match the number of flagged packages in
+`01-snyk-findings.md`, and every Snyk issue there should appear in some module's Issues table.
+
+**5. Reply.**
+
+- Everything looks right: **`approve`** (`/dep-run <repo> approve`, or the *Approve* button in Copilot).
+- Something's off: say what, e.g. *"module 3: override to 2.2, not 2.0"* or *"put the medium findings out of scope"*.
+  The plan is updated, and you approve the new version.
+
+**6. After verification**, `05-verification.md` has a **Vulnerable modules: before → after** table: one row per
+module and issue, marked **✅ fixed**, **➖ out of scope** (as planned), or **⛔ still open, not planned**. A ⛔ means
+the plan missed something; the report proposes a fix.
+
+**Regenerating the list** (e.g. after changing the scope). The assistant does this itself, but by hand it's:
+
+```bash
+python3 -I toolkit/scripts/parse-snyk.py workflows/wf-001-<repo>/snyk/<repo>.json --modules workflows/wf-001-<repo>/snyk/vulnerable-modules.md   # macOS
+```
+
+```powershell
+py -3 -I toolkit\scripts\parse-snyk.py workflows\wf-001-<repo>\snyk\<repo>.json --modules workflows\wf-001-<repo>\snyk\vulnerable-modules.md   # Windows
+```
 
 ## Saving workflow results into the repository
 
