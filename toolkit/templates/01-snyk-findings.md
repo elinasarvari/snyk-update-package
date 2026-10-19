@@ -21,11 +21,20 @@ One row per `package@version`. "Introduced via" = the direct dependency that pul
 
 ## 2. Changes to make — triaged
 
-| # | Direct dependency | Current | Target | Max severity | Issues fixed | Bucket | Real lever | Projects |
-|---|-------------------|---------|--------|--------------|--------------|--------|------------|----------|
+| # | Fix | Edit | Current | Target | Max severity | Issues fixed | Bucket | Real lever | Projects |
+|---|-----|------|---------|--------|--------------|--------------|--------|------------|----------|
 
-Bucket: `platform` (moves with a parent/BOM — name it in "Real lever") · `direct` ·
-`transitive-pin` · `no-fix / license`.
+Fix: `upgrade` · `override` (no upgrade path: force the vulnerable package to its fixed version) · `none`.
+Bucket: `platform` (moves with a parent/BOM; name it in "Real lever") · `direct` · `override` · `no-fix / license`.
+
+## 3. Detailed paths
+
+Every path each package arrives by, and the fix for that path (from `snyk/findings.md`, section 3). List here the
+packages whose status is **needs an override**, **partly fixable** or **no fix**, with their paths. These are the
+ones an obvious upgrade misses.
+
+| Package | Path | Fix for this path |
+|---------|------|-------------------|
 
 ## Scope decision
 

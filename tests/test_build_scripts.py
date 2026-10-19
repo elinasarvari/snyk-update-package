@@ -43,7 +43,10 @@ class VerifyRepoTests:
         out = os.path.join(self.tmp, "verify")
         proc = self.script("verify-repo.sh", repo, out, *args)
         summary = os.path.join(out, "summary.json")
-        return proc, (json.load(open(summary, encoding="utf-8")) if os.path.isfile(summary) else None)
+        if not os.path.isfile(summary):
+            return proc, None
+        with open(summary, encoding="utf-8") as fh:
+            return proc, json.load(fh)
 
     def test_green_build_counts_tests_from_junit_xml(self):
         proc, summary = self.verify(self.repo(), "--build-cmd", self.fake_build(tests=3, skipped=1))

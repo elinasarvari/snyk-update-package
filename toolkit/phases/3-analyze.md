@@ -15,6 +15,9 @@ Requires phase 2 ✅. Read-only. Writes `03-impact.md` and `03-plan.md`.
    - `report` = `workflows/<id>/analysis/<name>--<artifact>.md`
    - `coupled` = the coupled-dependency rows from 02 for that repo
    - the intermediate version lines to cover (e.g. `3.4, 3.5, 4.0, 4.1`)
+   **Research once:** if several items share the same lever jump and `workflows/_research/` has no file for it yet,
+   run the first analyst alone, so it writes the cache file. Then run the rest in parallel: they reuse the file
+   instead of fetching the same migration guides again.
 4. **Assemble** `03-impact.md`: the Summary table from each report's `SUMMARY |` line, then each report
    under "Per package" (link the analysis file). If two analysts disagree (e.g. on the Camel version),
    settle it from the cited sources, or record it as an open question in STATUS.
@@ -26,6 +29,17 @@ Requires phase 2 ✅. Read-only. Writes `03-impact.md` and `03-plan.md`.
      latest minor of the current major, then (b) the target, each a separately green checkpoint. Explain the choice.
    - **Order** the steps per repo so each compiles: pom/BOM bumps → coupled deps → renamed starters/artifacts
      → code package moves → config keys → test changes.
+   - **Remediation order, for every in-scope package and each of its detailed paths** (`01-snyk-findings.md` §3):
+     1. **upgrade** the dependency that brings it in, or the parent/BOM that sets that dependency's version;
+     2. no upgrade path but a fixed version exists → **override** the vulnerable package to it (`<dependencyManagement>`
+        in Maven, `constraints` in Gradle), after checking the introducing library works with that version
+        (its release notes, or that its tests still pass at verify);
+     3. no fixed version on that path → check whether a **newer version of the introducing library** drops or replaces
+        the package, or whether it can be **excluded** (`<exclusions>`) because nothing in the repo uses it
+        (`git grep` for its packages/classes);
+     4. only when 1–3 are exhausted does the path go to **Out of scope**, saying what was tried.
+   - **Path coverage table:** for each in-scope package, list each path and the plan step that fixes it, or "out of
+     scope". A package counts as fixed only when all its paths are.
    - Give exact diffs for pom/config edits, and precise descriptions with `path:line` for code edits.
      Paths are relative to the repo folder.
    - Each step's "Verify after" is `compile`, `test` or `smoke`.

@@ -11,10 +11,17 @@ workflows/_health/
 __pycache__/
 test-results.txt
 
-# Workflow records are personal: they stay on your machine, never in git (only workflows/README.md is tracked).
-workflows/wf-*/
-workflows/INDEX.md
+# Workflow records ARE saved to git by `workflows.py save` / /dep-save (keep this repository private!),
+# except bulky raw data that the documents already summarise:
+workflows/*/snyk/*.json
+!workflows/*/snyk/findings.json
+workflows/*/snyk/*.err
+workflows/*/**/.before-build.json
+workflows/*/**/.summary-fields.txt
+# The id counter is per machine; ids come from the folders (pulled before each new run).
 workflows/.last-id
 
 # Your own Claude Code permission answers ("Yes, and don't ask again") - personal, never committed.
 .claude/settings.local.json
+
+# The research cache (workflows/_research/) is saved too: every machine reuses it.

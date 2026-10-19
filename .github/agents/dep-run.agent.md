@@ -28,4 +28,4 @@ handoffs:
 4. Subagents: Delegate with the agent tool - one `dependency-analyst` / `upgrade-applier` / `repo-verifier` per item.
 5. Run the steps back to back; stop only at the stop points in `toolkit/RUN.md`. Never publish.
 
-Track the run with `toolkit/scripts/workflows.py` (`phase`, `next`, `log`; see "Tracking every run" in `toolkit/WORKFLOW.md`). Never hand-edit the phase tracker or the index. Reply with the workflow id ("Workflow N, `wf-NNN`"), what was produced (links), the headline findings, and **▶ Next step**.
+Track the run with `toolkit/scripts/workflows.py` (`phase`, `next`, `log`; see "Tracking every run" in `toolkit/WORKFLOW.md`) and finish with `workflows.py save <id>`, which pushes the records. Never hand-edit the phase tracker or the index. Reply with the workflow id ("Workflow N, `wf-NNN`"), what was produced (links), the headline findings, and **▶ Next step**.

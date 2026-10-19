@@ -13,4 +13,4 @@ argument-hint: "[status | workflow id (1, wf-001) | folder or git-url | snyk.jso
 4. Subagents: Launch the agents in one message so they run in parallel - one `dependency-analyst` / `repo-verifier` per item.
 5. Never run `/dep-apply` or `/dep-publish` yourself; offer them once their gates are met.
 
-Track the run with `toolkit/scripts/workflows.py` (`phase`, `next`, `log`; see "Tracking every run" in `toolkit/WORKFLOW.md`). Never hand-edit the phase tracker or the index. Reply with the workflow id ("Workflow N, `wf-NNN`"), what was produced (links), the headline findings, and **▶ Next step**.
+Track the run with `toolkit/scripts/workflows.py` (`phase`, `next`, `log`; see "Tracking every run" in `toolkit/WORKFLOW.md`) and finish with `workflows.py save <id>`, which pushes the records. Never hand-edit the phase tracker or the index. Reply with the workflow id ("Workflow N, `wf-NNN`"), what was produced (links), the headline findings, and **▶ Next step**.

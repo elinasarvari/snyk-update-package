@@ -27,9 +27,29 @@ Each step is small enough to build and test on its own. `/dep-apply` stops at th
 {{exact intended diff, or a precise description for code migrations}}
 ```
 
+## Path coverage
+
+Every in-scope Snyk finding, each of its dependency paths, and what fixes it. Nothing in scope may be missing here.
+
+| Package (severity) | Path | Fixed by | How |
+|--------------------|------|----------|-----|
+| `{{group:artifact@ver}}` (high) | `A@1` › `B@2` › `pkg@1.2` | Step 1 | upgrade `A` 1 → 2 |
+| | `C@3` › `pkg@1.2` | Step 2 | override `pkg` to 1.3 |
+
 ## Rollback
 
 Each clone `repos/<name>/` is changed on branch `deps/{{WORKFLOW_ID}}`, created from the latest main. Rollback = `repos.py --workflow {{WORKFLOW_ID}} release` (back to main);
 the branch is left for inspection, never force-deleted by the tooling.
 
 ## Out of scope / follow-ups
+
+Everything this plan deliberately does **not** fix, so nobody is surprised when it still shows up after the PR. Each
+row says what, why, and what happens next. Snyk findings land here only after the remediation order was exhausted
+(upgrade → override → newer introducing library / exclusion).
+
+| # | What | Kind | Paths affected | Remediation tried | Why not now | Next step / owner |
+|---|------|------|----------------|-------------------|-------------|-------------------|
+
+Kind: `no fix available` · `licence` · `outside the chosen scope` (e.g. medium/low) · `later stage` (e.g. the next
+major in a stepped upgrade) · `noticed, not needed` (deprecations, unrelated outdated libraries) · `outside the repo`
+(CI JDK, Docker base image, deployment config) · `needs a person` (manual QA, another team's service).

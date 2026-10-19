@@ -9,7 +9,8 @@ $py = Get-Python
 $prefix = @()
 if ($py.Count -gt 1) { $prefix = $py[1..($py.Count - 1)] }
 # (assign arrays directly: an `if` that yields a 1-item array hands back the bare item)
-$extra = @('-v')
+# Compact by default (a line of dots + the result) - cheap for people and assistants. Add -v for one line per test.
+$extra = @()
 if ($args.Count -gt 0) { $extra = @($args) }
 & $py[0] @prefix '-I' '-m' 'unittest' 'discover' '-s' 'tests' '-p' 'test_*.py' @extra
 exit $LASTEXITCODE

@@ -20,11 +20,15 @@ the repository**. The only file you write is the report path you are given (in t
    `spring-boot-starter-*`), the real change is the parent/BOM, and the analysis must cover
    the *whole* platform jump, not one artifact.
 2. **Classify the jump** — patch / minor / major — per semver of the lever, not the artifact.
-3. **Read the official sources for every version line crossed.** For a jump across majors or
-   several minors, read each intermediate migration guide / release note, e.g. Spring Boot
-   3.3→3.4→3.5→4.0→4.1. Prefer project-owned sources (GitHub wiki/release notes, reference
-   docs) over blogs. Record every URL you used. If a page cannot be fetched, say so — do not
-   fill the gap from memory without labelling it `unverified`.
+3. **Research once, reuse everywhere.** The research cache `workflows/_research/` holds one file per upgrade jump:
+   `<lever artifact>__<from major.minor>__<to major.minor>.md`, e.g. `spring-boot-starter-parent__3.3__4.1.md`.
+   - **If the file exists** (and is from the last 90 days), use it. Don't fetch the migration guides again. Only the
+     repo-specific search (step 5) is new work.
+   - **If it doesn't**, read the official sources for every version line crossed (e.g. Spring Boot
+     3.3→3.4→3.5→4.0→4.1): the "breaking changes" / "upgrading" sections of each migration guide and release note,
+     not whole pages. Prefer project-owned sources (GitHub wiki/release notes, reference docs) over blogs. Then
+     **write the cache file**: a dated list of the changes that could bite (step 4), each with its source URL. If a
+     page can't be fetched, say so; don't fill the gap from memory without labelling it `unverified`.
 4. **Build the list of changes that could bite**, from those sources: removed/renamed
    artifacts and starters, package relocations, removed/deprecated APIs, renamed config keys,
    changed defaults, minimum Java/Jakarta/Kotlin baselines, and *coupled library* requirements

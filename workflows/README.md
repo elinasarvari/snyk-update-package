@@ -1,8 +1,9 @@
 # workflows/: one folder per workflow run
 
 Every time you start the `/dep-*` workflow, the run gets the next **unique id** and its own folder.
-**The records stay on your machine:** `workflows/wf-*`, `INDEX.md` and `.last-id` are git-ignored, so a
-push never publishes them. Only this README is in git.
+**The records are pushed to this repository** (`/dep-save`, automatic at every stop), so you can read them on GitHub
+and on any machine that pulls. Raw Snyk JSON, logs and error files are left out, because the documents summarise them.
+Keep the repository private: saving refuses while it's public.
 
 | Run | Id | Folder | Branch it creates in each repo |
 |-----|----|--------|--------------------------------|
@@ -12,8 +13,8 @@ push never publishes them. Only this README is in git.
 - **Ids are never reused.** Even if you delete a folder, the next run gets a new number
   (`workflows/.last-id` remembers the highest one).
 - **Refer to a run however you like:** `1`, `wf-1`, `wf-001`, or the folder name, e.g. `/dep-inventory 1`.
-- **`INDEX.md` lists every run** with its current step and ▶ next step. It's created with your first run and rebuilt
-  automatically; don't edit it.
+- **`INDEX.md` lists every run** with its current step and ▶ next step. It's rebuilt automatically and pushed with
+  the records; don't edit it.
 
 ## Inside each run's folder
 

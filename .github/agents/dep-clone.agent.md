@@ -17,4 +17,4 @@ handoffs:
 2. Follow `toolkit/phases/0-clone.md` step by step. The user's message is the input.
 3. Templates are in `toolkit/templates/`, scripts in `toolkit/scripts/`. Run commands from the project root.
 
-Track the run with `toolkit/scripts/workflows.py` (`phase`, `next`, `log`; see "Tracking every run" in `toolkit/WORKFLOW.md`). Never hand-edit the phase tracker or the index. Reply with the workflow id ("Workflow N, `wf-NNN`"), what was produced (links), the headline findings, and **▶ Next step**.
+Track the run with `toolkit/scripts/workflows.py` (`phase`, `next`, `log`; see "Tracking every run" in `toolkit/WORKFLOW.md`) and finish with `workflows.py save <id>`, which pushes the records. Never hand-edit the phase tracker or the index. Reply with the workflow id ("Workflow N, `wf-NNN`"), what was produced (links), the headline findings, and **▶ Next step**.

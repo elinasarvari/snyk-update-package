@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Summarise one or more `snyk test --json` reports into a full findings inventory.
 
-Produces two views:
+Produces three views:
   1. Every flagged package  - one row per vulnerable package@version, with all its issues,
                               the fixed-in versions, how it gets into the build, and severity.
-  2. Changes to make        - rows grouped by the *direct* dependency you actually edit in
-                              the pom (upgradePath[1]), since many transitive findings are
-                              fixed by one direct bump (e.g. the Spring Boot parent).
+  2. Changes to make        - what to edit: an UPGRADE of the direct dependency Snyk names
+                              (upgradePath), or an OVERRIDE (pin) of the vulnerable package when no
+                              upgrade path exists but a fixed version does, or NONE.
+  3. Detailed paths         - every dependency path each package arrives by (`from`), with the fix
+                              for that path. A package is only fixed when EVERY path is.
+
+Remediation comes from each finding (upgradePath, isUpgradable, isPatchable, fixedIn) and, when the
+report has it, the project-level `remediation` section (upgrade / pin / patch / unresolved).
 
 Usage:
     python3 -I parse-snyk.py <report.json> [more.json ...]
@@ -68,9 +73,43 @@ def load_projects(paths):
     return projects
 
 
+MAX_PATHS_SHOWN = 20          # per package in the markdown (all of them are in the JSON)
+
+
+def project_remediation(project):
+    """Snyk's optional project-level remediation: {package name: pin target}, set of unresolved issue ids."""
+    rem = project.get("remediation") or {}
+    pins = {}
+    for coord, info in (rem.get("pin") or {}).items():
+        name, _ = split_coord(coord)
+        _, target = split_coord((info or {}).get("upgradeTo"))
+        if name and target:
+            pins[name] = target
+    unresolved = {u.get("id") for u in (rem.get("unresolved") or []) if isinstance(u, dict)}
+    return pins, unresolved
+
+
+def path_fix(vuln, path, pins, unresolved):
+    """-> (fix type, text) for ONE dependency path of one finding."""
+    upgrade = vuln.get("upgradePath") or []
+    direct_name, direct_version = split_coord(path[1] if len(path) > 1 else None)
+    pkg = vuln.get("packageName")
+    _, target = split_coord(upgrade[1] if len(upgrade) > 1 else None)
+    if vuln.get("isUpgradable") and target and direct_name:
+        return "upgrade", "upgrade `%s` %s -> %s" % (direct_name, direct_version, target)
+    if pkg in pins:
+        return "override", "override `%s` to %s (Snyk pin; no upgrade path)" % (pkg, pins[pkg])
+    if vuln.get("fixedIn"):
+        return "override", "override `%s` to %s (no upgrade path: dependencyManagement / constraints)" % (
+            pkg, sorted(vuln["fixedIn"])[0])
+    if vuln.get("isPatchable"):
+        return "patch", "Snyk patch only"
+    return "none", "no remediation path" + (" (Snyk: unresolved)" if vuln.get("id") in unresolved else "")
+
+
 def collect(projects):
     packages = OrderedDict()   # view 1, key: package@version
-    changes = OrderedDict()    # view 2, key: (direct dep, current, target)
+    changes = OrderedDict()    # view 2, key: (fix type, what, current, target)
     totals = OrderedDict((s, 0) for s in ("critical", "high", "medium", "low"))
     seen_issue_rows = set()
 
@@ -78,6 +117,7 @@ def collect(projects):
         name = project.get("projectName") or project.get("path") or "unknown"
         target_file = project.get("displayTargetFile") or ""
         location = "%s (%s)" % (name, target_file) if target_file else name
+        pins, unresolved = project_remediation(project)
 
         for vuln in project.get("vulnerabilities", []):
             path = vuln.get("from") or []
@@ -93,14 +133,7 @@ def collect(projects):
             _, target_version = split_coord(upgrade[1] if len(upgrade) > 1 else None)
             is_direct = direct_name == pkg_name
 
-            if vuln.get("isUpgradable") and target_version:
-                remedy = "upgrade `%s` %s -> %s" % (direct_name, direct_version, target_version)
-            elif vuln.get("isPatchable"):
-                remedy = "Snyk patch only"
-            elif vuln.get("fixedIn"):
-                remedy = "no direct upgrade path - pin/override to %s" % ", ".join(vuln["fixedIn"])
-            else:
-                remedy = "no fix available"
+            fix_type, remedy = path_fix(vuln, path, pins, unresolved)
 
             # Same issue appears once per dependency path; count each issue once per project.
             issue_key = (location, vuln.get("id"), pkg_name, pkg_version)
@@ -112,6 +145,7 @@ def collect(projects):
                 "package": pkg_name, "version": pkg_version, "type": kind,
                 "max_severity": severity, "issues": [], "cves": [], "fixed_in": [],
                 "introduced_via": [], "remediation": [], "projects": [], "direct": is_direct,
+                "paths": [], "fix_types": [],
             })
             pkg["max_severity"] = worse(severity, pkg["max_severity"])
             add_unique(pkg["issues"], "%s %s (%s)" % (vuln.get("id"), vuln.get("title", ""), severity))
@@ -123,10 +157,21 @@ def collect(projects):
                 add_unique(pkg["introduced_via"], "%s@%s" % (direct_name, direct_version))
             add_unique(pkg["remediation"], remedy)
             add_unique(pkg["projects"], location)
+            add_unique(pkg["fix_types"], fix_type)
+            entry = {"path": path[1:] or [pkg_name], "project": location, "fix": fix_type, "remediation": remedy}
+            if entry not in pkg["paths"]:
+                pkg["paths"].append(entry)
 
-            change = changes.setdefault((direct_name, direct_version, target_version), {
-                "direct_dependency": direct_name, "current_version": direct_version,
-                "target_version": target_version, "max_severity": severity,
+            if fix_type == "override":                    # edit: force the vulnerable package itself
+                pinned = remedy.split(" to ", 1)[1].split(" ", 1)[0]
+                key = ("override", pkg_name, pkg_version, pinned)
+                what, current, target = pkg_name, pkg_version, pinned
+            else:                                         # edit: the direct dependency (upgrade, or nothing to do)
+                key = (fix_type, direct_name, direct_version, target_version)
+                what, current, target = direct_name, direct_version, target_version
+            change = changes.setdefault(key, {
+                "fix": fix_type, "direct_dependency": what, "current_version": current,
+                "target_version": target, "max_severity": severity,
                 "fixes_packages": [], "issue_count": 0, "projects": [],
             })
             change["max_severity"] = worse(severity, change["max_severity"])
@@ -135,6 +180,10 @@ def collect(projects):
 
     for change in changes.values():
         change["issue_count"] = sum(len(packages[p]["issues"]) for p in change["fixes_packages"])
+    for pkg in packages.values():
+        kinds = set(pkg["fix_types"])
+        pkg["status"] = ("no fix" if kinds == {"none"} else "partly fixable" if "none" in kinds
+                         else "needs an override" if "override" in kinds else "fixable by upgrade")
 
     by_sev = lambda row: -SEVERITY_ORDER.get(row["max_severity"], 0)
     return (sorted(packages.values(), key=by_sev), sorted(changes.values(), key=by_sev), totals)
@@ -163,34 +212,50 @@ def to_markdown(packages, changes, totals, projects):
     out += scanned_projects(projects)
 
     out += ["", "## 1. Every flagged package", "",
-            "| # | Package | Current | Severity | Issues | CVEs | Fixed in | Introduced via | Remediation | Projects |",
-            "|---|---------|---------|----------|--------|------|----------|----------------|-------------|----------|"]
+            "| # | Package | Current | Severity | Status | Paths | Issues | CVEs | Fixed in | Introduced via | Remediation | Projects |",
+            "|---|---------|---------|----------|--------|-------|--------|------|----------|----------------|-------------|----------|"]
     for i, p in enumerate(packages, 1):
-        out.append("| %d | `%s`%s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+        out.append("| %d | `%s`%s | %s | %s | %s | %d | %s | %s | %s | %s | %s | %s |" % (
             i, p["package"], " (license)" if p["type"] == "license" else "", p["version"],
-            p["max_severity"], "<br>".join(p["issues"]), ", ".join(p["cves"]) or "-",
+            p["max_severity"], p["status"], len(p["paths"]), "<br>".join(p["issues"]), ", ".join(p["cves"]) or "-",
             ", ".join(p["fixed_in"]) or "-",
             "direct" if p["direct"] else "<br>".join("`%s`" % v for v in p["introduced_via"]),
             "<br>".join(p["remediation"]), "<br>".join(p["projects"])))
 
-    out += ["", "## 2. Changes to make (grouped by the dependency you edit)", "",
-            "| # | Direct dependency | Current | Target | Max severity | Issues fixed | Fixes packages | Projects |",
-            "|---|-------------------|---------|--------|--------------|--------------|----------------|----------|"]
+    out += ["", "## 2. Changes to make", "",
+            "`upgrade`: bump the direct dependency (or the parent/BOM that sets it). `override`: no upgrade path exists,",
+            "so force the vulnerable package itself to its fixed version (Maven `<dependencyManagement>`, Gradle",
+            "constraints) - check compatibility. `none`: no remediation path; see the detailed paths.", "",
+            "| # | Fix | Edit | Current | Target | Max severity | Issues fixed | Fixes packages | Projects |",
+            "|---|-----|------|---------|--------|--------------|--------------|----------------|----------|"]
     for i, c in enumerate(changes, 1):
-        out.append("| %d | `%s` | %s | %s | %s | %d | %s | %s |" % (
-            i, c["direct_dependency"], c["current_version"],
+        out.append("| %d | %s | `%s` | %s | %s | %s | %d | %s | %s |" % (
+            i, c["fix"], c["direct_dependency"], c["current_version"],
             c["target_version"] or "_no upgrade path_", c["max_severity"], c["issue_count"],
             "<br>".join("`%s`" % p for p in c["fixes_packages"]), "<br>".join(c["projects"])))
+
+    out += ["", "## 3. Detailed paths", "",
+            "Every path a package arrives by, and the fix for that path. A package is only fixed when every one of",
+            "its paths is: e.g. upgrading `A` doesn't help if `C` still brings the old version in."]
+    for p in packages:
+        out += ["", "### `%s@%s` - %s - %s - fixed in %s" % (p["package"], p["version"], p["max_severity"], p["status"],
+                                                             ", ".join(p["fixed_in"]) or "none"), "",
+                "| # | Path | Fix for this path | Project |", "|---|------|-------------------|---------|"]
+        for n, entry in enumerate(p["paths"][:MAX_PATHS_SHOWN], 1):
+            out.append("| %d | %s | %s | %s |" % (n, " › ".join("`%s`" % c for c in entry["path"]), entry["remediation"],
+                                               entry["project"]))
+        if len(p["paths"]) > MAX_PATHS_SHOWN:
+            out.append("| | _… %d more paths in findings.json_ | | |" % (len(p["paths"]) - MAX_PATHS_SHOWN))
     return "\n".join(out) + "\n"
 
 
 def write_csv(path, packages):
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        writer.writerow(["package", "current_version", "type", "max_severity", "issues", "cves",
+        writer.writerow(["package", "current_version", "type", "max_severity", "status", "paths", "issues", "cves",
                          "fixed_in", "introduced_via", "remediation", "projects"])
         for p in packages:
-            writer.writerow([p["package"], p["version"], p["type"], p["max_severity"],
+            writer.writerow([p["package"], p["version"], p["type"], p["max_severity"], p["status"], len(p["paths"]),
                              "; ".join(p["issues"]), "; ".join(p["cves"]), "; ".join(p["fixed_in"]),
                              "direct" if p["direct"] else "; ".join(p["introduced_via"]),
                              "; ".join(p["remediation"]), "; ".join(p["projects"])])

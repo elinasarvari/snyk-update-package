@@ -81,7 +81,9 @@ class ParseSnyk(Sandbox):
         lic = next(p for p in data["packages"] if p["package"] == "org.foo:gpl")
         self.assertEqual(lic["type"], "license")
         self.assertIn("`org.foo:gpl` (license)", md)
-        self.assertIn("no fix available", next(p for p in data["packages"] if p["package"] == "org.foo:bar")["remediation"])
+        nofix = next(p for p in data["packages"] if p["package"] == "org.foo:bar")
+        self.assertIn("no remediation path", nofix["remediation"])
+        self.assertEqual(nofix["status"], "no fix")
 
     def test_non_snyk_files_are_skipped_with_a_warning(self):
         _, stdout, _ = self.parse(*self.reports())
@@ -94,8 +96,8 @@ class ParseSnyk(Sandbox):
             rows = list(csv.DictReader(fh))
         self.assertEqual(len(rows), 5)
         self.assertEqual(rows[0]["package"], "org.springframework:spring-webmvc")
-        self.assertEqual(set(rows[0]), {"package", "current_version", "type", "max_severity", "issues", "cves",
-                                        "fixed_in", "introduced_via", "remediation", "projects"})
+        self.assertEqual(set(rows[0]), {"package", "current_version", "type", "max_severity", "status", "paths", "issues",
+                                        "cves", "fixed_in", "introduced_via", "remediation", "projects"})
 
 
 FAKE_SNYK = """import json, os, sys
@@ -109,6 +111,71 @@ if args[:1] == ["whoami"]:
 print(json.dumps(json.loads(%(report)r)))
 sys.exit(%(test_exit)d)
 """
+
+
+class RemediationAndPaths(Sandbox):
+    """A package can arrive by several paths; each path has its own fix (or none). Snyk's remediation section counts."""
+
+    def report(self, vulns, remediation=None):
+        project = {"projectName": "com.example:app", "displayTargetFile": "pom.xml", "vulnerabilities": vulns}
+        if remediation is not None:
+            project["remediation"] = remediation
+        return self.write("in/r.json", json.dumps(project))
+
+    def parse(self, path):
+        out = os.path.join(self.root, "out")
+        proc = self.script("parse-snyk.py", path, "--json", out + ".json", "--md", out + ".md", check=True)
+        with open(out + ".json", encoding="utf-8") as fh:
+            return json.load(fh), self.read(out + ".md")
+
+    def snakeyaml(self, via, upgrade_to=None, fixed=("2.0",), vid="SNYK-YAML-1"):
+        return vuln(vid, "org.yaml:snakeyaml", "1.33", "high", [APP] + via + ["org.yaml:snakeyaml@1.33"],
+                    [False, upgrade_to] if upgrade_to else [], list(fixed), ["CVE-2022-1471"],
+                    upgradable=bool(upgrade_to))
+
+    def test_every_path_is_listed_with_its_own_fix(self):
+        data, md = self.parse(self.report([
+            self.snakeyaml(["org.springframework.boot:spring-boot-starter@3.0.0"],
+                           upgrade_to="org.springframework.boot:spring-boot-starter@3.2.0"),
+            self.snakeyaml(["com.acme:legacy-config@1.0"]),                          # no upgrade path, but a fix exists
+        ]))
+        pkg = data["packages"][0]
+        self.assertEqual(len(pkg["paths"]), 2)
+        fixes = {tuple(p["path"]): p["fix"] for p in pkg["paths"]}
+        self.assertEqual(fixes[("org.springframework.boot:spring-boot-starter@3.0.0", "org.yaml:snakeyaml@1.33")], "upgrade")
+        self.assertEqual(fixes[("com.acme:legacy-config@1.0", "org.yaml:snakeyaml@1.33")], "override")
+        self.assertEqual(pkg["status"], "needs an override", "upgrading the starter alone leaves the legacy path open")
+        kinds = {(c["fix"], c["direct_dependency"], c["target_version"]) for c in data["changes"]}
+        self.assertIn(("upgrade", "org.springframework.boot:spring-boot-starter", "3.2.0"), kinds)
+        self.assertIn(("override", "org.yaml:snakeyaml", "2.0"), kinds, "the override is planned, not dropped")
+        self.assertIn("## 3. Detailed paths", md)
+        self.assertIn("`com.acme:legacy-config@1.0` › `org.yaml:snakeyaml@1.33`", md)
+        self.assertIn("override `org.yaml:snakeyaml` to 2.0", md)
+
+    def test_snyk_pin_suggestion_is_used(self):
+        data, _ = self.parse(self.report(
+            [self.snakeyaml(["com.acme:legacy-config@1.0"], fixed=("2.0", "1.34"))],
+            remediation={"pin": {"org.yaml:snakeyaml@1.33": {"upgradeTo": "org.yaml:snakeyaml@2.2", "vulns": ["SNYK-YAML-1"]}}}))
+        path = data["packages"][0]["paths"][0]
+        self.assertEqual(path["fix"], "override")
+        self.assertIn("to 2.2 (Snyk pin", path["remediation"])
+
+    def test_a_path_without_any_remediation_makes_the_package_partly_fixable(self):
+        unfixable = vuln("SNYK-YAML-1", "org.yaml:snakeyaml", "1.33", "high",
+                         [APP, "com.acme:old-thing@0.9", "org.yaml:snakeyaml@1.33"], [], [], upgradable=False)
+        data, md = self.parse(self.report(
+            [self.snakeyaml(["org.springframework.boot:spring-boot-starter@3.0.0"],
+                            upgrade_to="org.springframework.boot:spring-boot-starter@3.2.0"), unfixable],
+            remediation={"unresolved": [{"id": "SNYK-YAML-1"}]}))
+        pkg = data["packages"][0]
+        self.assertEqual(pkg["status"], "partly fixable")
+        self.assertIn("no remediation path (Snyk: unresolved)", [p["remediation"] for p in pkg["paths"]])
+
+    def test_long_path_lists_are_capped_in_markdown_but_complete_in_json(self):
+        vulns = [self.snakeyaml(["com.acme:lib-%02d@1.0" % n]) for n in range(25)]
+        data, md = self.parse(self.report(vulns))
+        self.assertEqual(len(data["packages"][0]["paths"]), 25)
+        self.assertIn("… 5 more paths in findings.json", md)
 
 
 class SnykScanTests:

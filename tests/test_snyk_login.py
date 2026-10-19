@@ -89,7 +89,8 @@ class SnykLoginTests:
         for name in os.listdir(temp):                         # nothing on disk may hold the secret
             path = os.path.join(temp, name)
             if os.path.isfile(path):
-                self.assertNotIn(SECRET, open(path, encoding="utf-8", errors="replace").read(), name)
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    self.assertNotIn(SECRET, fh.read(), name)
 
     def test_browser_option_wins_over_client_credentials(self):
         env = dict(self.fake_cli(), SNYK_CLIENT_ID="svc-acct-123", SNYK_CLIENT_SECRET=SECRET)

@@ -3,7 +3,7 @@
 # Windows/PowerShell twin: verify-repo.ps1 (same arguments, same output). Parsing lives in script-helpers.py.
 #
 # Usage: verify-repo.sh <repo-dir> <out-dir> [--smoke] [--build-cmd "<cmd>"]
-#   --smoke       after a green build, start the packaged jar on a random port and wait
+#   --smoke       (Spring Boot apps only) after a green build, start the packaged jar on a random port and wait
 #                 for Spring Boot's "Started ... in" line (catches startup-only failures
 #                 like Boot/Camel version mismatches that unit tests can miss)
 #   --build-cmd   override the auto-detected build command

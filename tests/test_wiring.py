@@ -15,7 +15,7 @@ import unittest
 from helpers import ON_WINDOWS, POWERSHELL, PROJECT
 
 PHASES = ["dep-clone", "dep-scan", "dep-inventory", "dep-analyze", "dep-apply", "dep-verify", "dep-publish"]
-COMMANDS = ["dep-upgrade", "dep-run", "dep-login"] + PHASES
+COMMANDS = ["dep-upgrade", "dep-run", "dep-login", "dep-save"] + PHASES
 SUBAGENTS = ["dependency-analyst", "upgrade-applier", "repo-verifier"]
 MANUAL_ONLY = ["dep-apply", "dep-publish", "dep-run"]   # can change code or push: user-started only
 
@@ -160,7 +160,7 @@ class FrontmatterAndLinks(unittest.TestCase):
         for rel in sources:
             for ref in re.findall(r"`((?:toolkit|tools|repos|workflows|\.github|\.claude)/[^`\s]*)", read(rel)):
                 ref = ref.rstrip("/.,):")
-                if any(ch in ref for ch in "<>{}*…") or ref.startswith(("workflows/wf-", "workflows/_health", "workflows/INDEX.md", "repos/inventory-service",
+                if any(ch in ref for ch in "<>{}*…") or ref.startswith(("workflows/wf-", "workflows/_health", "workflows/_research", "workflows/INDEX.md", "repos/inventory-service",
                                                                          ".claude/settings.local.json")):
                     continue                                   # placeholders / generated-at-runtime paths
                 if not os.path.exists(os.path.join(PROJECT, ref)):
@@ -231,6 +231,78 @@ class BranchNamesAreConsistent(unittest.TestCase):
     def test_the_code_builds_the_branch_name_from_the_workflow_id_only(self):
         self.assertIn('return "deps/" + wf_id', read("toolkit/scripts/repos.py"))
         self.assertIn("`deps/{{WORKFLOW_ID}}`", read("toolkit/templates/STATUS.md"))
+
+
+class NotTiedToOneLibrary(unittest.TestCase):
+    """The packages come from the Snyk findings; library names may only appear as examples."""
+
+    def test_scripts_contain_no_library_specific_logic(self):
+        import ast
+        names = re.compile(r"spring|camel|jackson|hibernate|tomcat|netty", re.I)
+        for f in sorted(os.listdir(os.path.join(PROJECT, "toolkit", "scripts"))):
+            text = read("toolkit/scripts/" + f)
+            if f.endswith(".py"):                       # code only: no comments, no docstrings
+                tree = ast.parse(text)
+                for node in ast.walk(tree):
+                    body = getattr(node, "body", None)
+                    if isinstance(body, list) and body and isinstance(body[0], ast.Expr) \
+                            and isinstance(getattr(body[0], "value", None), ast.Constant) and isinstance(body[0].value.value, str):
+                        body.pop(0)
+                code = ast.unparse(tree)
+            else:                                       # shell / PowerShell: drop comments
+                code = "\n".join(l.split(" #", 1)[0] for l in text.splitlines() if not l.lstrip().startswith("#"))
+            hit = names.search(code)
+            self.assertIsNone(hit, "%s has library-specific code near: %r" % (f, code[max(0, hit.start() - 60):hit.end() + 20] if hit else ""))
+
+    def test_overview_says_targets_come_from_the_findings(self):
+        self.assertIn("Nothing here is specific to one library", read("toolkit/WORKFLOW.md"))
+
+
+class RemediationAndScope(unittest.TestCase):
+    """Nothing in scope is silently dropped: every path gets a fix or an explained out-of-scope entry."""
+
+    def test_plan_follows_the_remediation_order_and_covers_every_path(self):
+        text = read("toolkit/phases/3-analyze.md")
+        for must in ("Remediation order", "**upgrade**", "**override**", "**excluded**", "Path coverage table",
+                     "**Out of scope**"):
+            self.assertIn(must, text)
+        plan = read("toolkit/templates/03-plan.md")
+        self.assertIn("## Path coverage", plan)
+        self.assertIn("| # | What | Kind | Paths affected | Remediation tried | Why not now | Next step / owner |", plan)
+
+    def test_findings_show_fix_types_and_detailed_paths(self):
+        self.assertIn("## 3. Detailed paths", read("toolkit/templates/01-snyk-findings.md"))
+        self.assertIn("**detailed\n   paths**", read("toolkit/phases/1-scan.md"))
+
+    def test_leftover_findings_are_checked_and_reported(self):
+        self.assertIn("must be in `03-plan.md` → Out of scope", read("toolkit/phases/5-verify.md"))
+        self.assertIn("Known remaining issues", read("toolkit/phases/6-publish.md"))
+
+
+class TokenBudget(unittest.TestCase):
+    """Rules that keep the assistants from reading or printing more than they need."""
+
+    def test_budget_rules_steer_away_from_large_files(self):
+        text = read("toolkit/WORKFLOW.md")
+        self.assertIn("## Token budget", text)
+        for must in ("snyk/*.json", "first-errors", "filtered-tree.txt", "git -C <repo> grep -n -l", "workflows/_research/"):
+            self.assertIn(must, text)
+
+    def test_research_is_cached_and_reused(self):
+        self.assertIn("workflows/_research/", read("toolkit/roles/dependency-analyst.md"))
+        self.assertIn("Research once", read("toolkit/phases/3-analyze.md"))
+        self.assertIn("workflows/_research/", read(".gitignore"))
+
+    def test_mechanical_subagent_uses_the_small_model(self):
+        data, _ = frontmatter(".claude/agents/repo-verifier.md")
+        self.assertEqual(data.get("model"), "haiku")
+        for name in ("dependency-analyst", "upgrade-applier"):          # these need the session's (strong) model
+            self.assertNotIn("model", frontmatter(".claude/agents/%s.md" % name)[0])
+        self.assertIn("first-errors", read("toolkit/roles/repo-verifier.md"))
+
+    def test_test_runners_are_compact_by_default(self):
+        self.assertNotIn('"${@:--v}"', read("tests/run.sh"))
+        self.assertNotIn("@('-v')", read("tests/run.ps1"))
 
 
 class ScriptsAreSound(unittest.TestCase):

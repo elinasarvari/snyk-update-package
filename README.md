@@ -13,6 +13,9 @@ Works with **GitHub Copilot** (VS Code, agent mode) and **Claude Code**: same co
                                   package      moves with it    a plan
 ```
 
+**How it fits together:** see the diagrams in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**: components, the workflow's
+steps and gates, one `/dep-run` in order, where every file lives, and what each step reads and writes.
+
 This project holds **no application code** and is **not** a container of submodules. It keeps **the list,
 the workflow, and the tracking**. The repos you fix are **cloned into `repos/<name>/`**, and **that is where the
 code changes happen**, on one branch per workflow (`deps/wf-NNN`, from the latest main). The changes reach each
@@ -93,7 +96,7 @@ orders-service     git@github.com:my-org/orders-service.git            branch=de
 - `git-url`: what you'd give `git clone`. Already checked out? `repos.py add ~/repos/x` looks the URL up for you
 - `branch`: the repo's main branch, if it isn't called `main`
 - `path`: the sub-folder that has the `pom.xml`, if it isn't at the repo root
-- `smoke=true`: also start the app during verification
+- `smoke=true`: also start the app during verification (Spring Boot apps)
 
 **3. Clone them** into `repos/` (optional: `/dep-run` does this as its first step):
 
@@ -154,6 +157,21 @@ and where it stands, open [`workflows/INDEX.md`](workflows/INDEX.md) or run **`/
 
 ---
 
+## Saving workflow records to GitHub
+
+Every workflow's folder (`workflows/wf-NNN-<repo>/`), the index and the research cache are **committed and pushed to
+this repository**, so the documentation is on GitHub and on every machine that pulls it.
+
+- **Automatic:** `/dep-run` and every step save when they finish or stop. To save by hand: **`/dep-save <id>`**, or
+  `python3 -I toolkit/scripts/workflows.py save <id>` (Windows: `py -3 -I toolkit\scripts\workflows.py save <id>`).
+- **Only the records:** it commits that workflow's files and nothing else, so other changes you have in this repo are
+  left alone. Raw Snyk JSON, logs and error files are never committed; the documents summarise them.
+- **Several machines:** a new workflow first pulls what was pushed elsewhere, so the numbers don't clash, and a save
+  rebases onto newer records before pushing.
+- **Keep this repository private.** The records name your repos and list their open vulnerabilities, so **saving
+  refuses while the repository is public**. Make it private on GitHub: *Settings → General → Danger Zone → Change
+  visibility*. Only if publishing really is intended: `save <id> --allow-public`.
+
 ## Setting up GitHub Copilot (VS Code)
 
 The `/dep-*` commands are ordinary files in this project (`.github/prompts`, `.github/agents`, `.github/skills`,
@@ -173,13 +191,14 @@ folder?"*, choose **Yes, I trust the authors**.
 - set the **Session Target** control to **Local**, because the `/dep-*` slash commands only work in Local sessions;
 - in the **Agent** dropdown you can also pick a command's agent directly (e.g. `dep-run`).
 
-**4. Check the commands are there.** Type **`/dep`** in the chat box. You should see all ten:
+**4. Check the commands are there.** Type **`/dep`** in the chat box. You should see all eleven:
 
 | Command | What it's for |
 |---------|---------------|
 | `/dep-run <repo>` | **Start here:** runs every step for one repo, stops for your approval |
 | `/dep-login` | Log the Snyk CLI in (browser SSO) |
 | `/dep-upgrade status` | Where every workflow stands |
+| `/dep-save [id]` | Push a workflow's records to this repo (automatic at every stop) |
 | `/dep-clone`, `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-apply`, `/dep-verify`, `/dep-publish` | The steps one by one |
 
 The three helpers (`dependency-analyst`, `upgrade-applier`, `repo-verifier`) are **meant** to be invisible: `/dep-run`
@@ -250,7 +269,7 @@ claude
 account, or a **Claude Console** (API) account; the free plan doesn't include Claude Code. Later, `/login` switches
 accounts.
 
-**4. Check the commands are there.** Type **`/dep`**: autocomplete shows all ten, with a hint for what each one
+**4. Check the commands are there.** Type **`/dep`**: autocomplete shows all eleven, with a hint for what each one
 takes (e.g. `/dep-run <repo name | git URL | local checkout> …`). `/skills` lists them too.
 
 | Command | What it's for |
@@ -258,6 +277,7 @@ takes (e.g. `/dep-run <repo name | git URL | local checkout> …`). `/skills` li
 | `/dep-run <repo>` | **Start here:** runs every step for one repo, stops for your approval |
 | `/dep-login` | Log the Snyk CLI in (browser SSO) |
 | `/dep-upgrade status` | Where every workflow stands |
+| `/dep-save [id]` | Push a workflow's records to this repo (automatic at every stop) |
 | `/dep-clone`, `/dep-scan`, `/dep-inventory`, `/dep-analyze`, `/dep-apply`, `/dep-verify`, `/dep-publish` | The steps one by one |
 
 The helpers in `.claude/agents/` (`dependency-analyst`, `upgrade-applier`, `repo-verifier`) aren't commands. Claude
@@ -285,7 +305,7 @@ starts them by itself during `/dep-analyze`, `/dep-apply`, `/dep-verify` and `/d
 | File | Effect |
 |------|--------|
 | `CLAUDE.md` | Project rules in every session: changes only in `repos/<name>/` clones, never publish without you, run the tests |
-| `.claude/skills/dep-*/` | The ten `/dep-*` commands |
+| `.claude/skills/dep-*/` | The eleven `/dep-*` commands |
 | `.claude/agents/` | The three helpers |
 | `.claude/settings.json` | Claude may not read or edit inside `target/`, `node_modules/`, `.git/` … under `repos/` (`/permissions` lists these rules) |
 
@@ -473,6 +493,32 @@ before a scan starts.
 | **Log out** | `--logout` on the same command |
 | **Sign in again anyway** | `--force` on the same command |
 
+## Saving tokens
+
+The toolkit is set up to keep the assistants' context small, and you can help.
+
+**Already done for you:**
+
+- **Scripts print summaries, not raw output:** Maven's output goes to `build.log`, a build ends in a ~20-line
+  summary, Snyk's raw JSON is condensed into `findings.md`, and the tests print a line of dots.
+- **The assistants are told not to open the big files:** raw Snyk JSON, whole build logs, the whole dependency tree.
+  They use the summaries and the `first-errors` helper instead (*Token budget* in `toolkit/WORKFLOW.md`).
+- **Migration research happens once per upgrade jump.** E.g. "Spring Boot 3.3 → 4.1" is saved in
+  `workflows/_research/` and reused by every later workflow and repo, instead of fetching the same guides again.
+- **Searches skip `target/`, `node_modules/`, `.git/` …**, and the assistants find code with `git grep`.
+- **The verify helper runs on a smaller model** (Claude: Haiku). It only runs a script and reads a summary.
+- **State lives in files** (`STATUS.md` and the numbered documents), so no step needs the earlier conversation.
+
+**Habits that help:**
+
+| Do | Why |
+|----|-----|
+| **Start a fresh chat after each stop** (after the plan, after verification), then `/dep-run <repo>` again | It resumes from `STATUS.md`, so you lose nothing and the new chat starts small. Copilot: *New Chat* (`+`). Claude Code: `/clear` |
+| **One repo per `/dep-run`** | Each workflow stays small, and the research cache makes the second repo much cheaper than the first |
+| **Ask "where are we?" with `/dep-upgrade status`**, or open `workflows/INDEX.md` | Cheaper than asking the assistant to re-read documents |
+| **Don't ask it to paste logs or whole files** into the chat | Open the linked file yourself, or ask for the part you need |
+| **Claude Code: `/context`** shows what fills the context, **`/compact`** shrinks a long session | Useful in a long `/dep-run` |
+
 ## The commands
 
 | Command | What it does | Creates (in `workflows/<id>/`) | Changes your repos? |
@@ -486,6 +532,7 @@ before a scan starts.
 | `/dep-verify <id>` | Full build, all tests and app boot for every repo, plus a Snyk re-scan. Each failure is marked regression, already-failing or environment | `05-verification.md`, `verification/after/` | no |
 | `/dep-publish <id>` | Commits, pushes `deps/<id>`, opens a PR per repo with a description built from the docs | `06-publish.md` | **commits, pushes, opens PRs** |
 | `/dep-run <repo> [id] [reply]` | **Autopilot:** every step for one repo, stopping only for your approval, blockers, and before publish | everything up to `05-verification.md` | only after you approve the plan |
+| `/dep-save [id]` | Commits and pushes a workflow's records to this repo (automatic at every stop) | — | no (pushes **this** repo) |
 | `/dep-upgrade [status \| id]` | Shows where every workflow stands, or runs one next step | `STATUS.md` | — |
 | `/dep-verify baseline` | Health check of all repos, outside any upgrade | `workflows/_health/` (git-ignored) | no |
 
@@ -505,10 +552,10 @@ Inside one run's folder:
 ```text
 workflows/wf-001-spring-boot-4-1/
 ├── STATUS.md               ← start here: step tracker, ▶ next step, repos, decisions, timestamped History
-├── 01-snyk-findings.md     every flagged package + the changes they boil down to
+├── 01-snyk-findings.md     every flagged package, the changes (upgrade / override), every dependency path
 ├── 02-inventory.md         current vs target, what moves with it, coupled libraries, baseline
 ├── 03-impact.md            what breaks, where (file:line), with sources
-├── 03-plan.md              ordered steps with exact diffs + the approval box
+├── 03-plan.md              ordered steps with exact diffs, which step fixes each path, out of scope, approval
 ├── 04-apply-log.md         what changed per step, deviations from the plan
 ├── 05-verification.md      build/test/boot results per repo, before vs after, verdict
 ├── 06-publish.md           commits and PR links
@@ -525,8 +572,8 @@ workflows/wf-001-spring-boot-4-1/
 | `repos/repos.txt` | The list of repos to fix (git URLs). Ships with commented-out examples only | **yes**, this is your list (see the note below) |
 | `repos/README.md` | How to add repos (local vs URL), check, clone, refresh and remove them | — |
 | `repos/<name>/` | Clones of repos listed by URL (git-ignored, never committed here) | no, managed by `/dep-clone` |
-| `workflows/wf-NNN-<slug>/` | One folder per workflow run (Workflow 1 = `wf-001`, …). **Stays on your machine, git-ignored** | generated, review it |
-| `workflows/INDEX.md` | All runs with their current step and next step. Created on your machine with your first run (git-ignored) | no, rebuilt automatically |
+| `workflows/wf-NNN-<slug>/` | One folder per workflow run (Workflow 1 = `wf-001`, …). **Pushed to this repo** by `/dep-save` (automatic at every stop), raw Snyk JSON and logs excluded | generated, review it |
+| `workflows/INDEX.md` | All runs with their current step and next step. Pushed with the records | no, rebuilt automatically |
 | `workflows/README.md` | How workflow ids and folders work | — |
 | `toolkit/WORKFLOW.md` | Overview the assistants read first: phases, gates, rules | to change behaviour |
 | `toolkit/RUN.md` | What `/dep-run` does: step order, when it continues, when it stops, its final reply | to change behaviour |
@@ -549,13 +596,15 @@ workflows/wf-001-spring-boot-4-1/
 | `.github/skills/dep-upgrade/SKILL.md`, `.github/copilot-instructions.md`, `.github/instructions/` | Copilot context and pom-editing rules | rarely |
 | `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` | Claude Code commands and subagents (**generated**, except `CLAUDE.md`) | no, regenerate |
 | `tools/generate-entrypoints.py` | Regenerates the Copilot and Claude files from one spec | when adding a command |
+| `docs/ARCHITECTURE.md` | Architecture diagrams (Mermaid, rendered by GitHub) | when the design changes |
 | `tests/` | Automated tests for every script and command (`tests/run.sh`, `tests\\run.ps1`), run locally | when changing behaviour |
 | `.gitattributes` | Keeps LF line endings on Windows checkouts, so the bash scripts keep working | no |
 
-**What stays private:** your workflow records (`workflows/wf-*`, `INDEX.md`) and the clones (`repos/<name>/`)
-are git-ignored, so they never leave your machine with a push. `repos/repos.txt` is tracked so the project ships an
-example. Once you add your own repos to it, don't commit it (`git status` shows it as modified), or keep it
-uncommitted with `git update-index --skip-worktree repos/repos.txt`.
+**What goes to GitHub:** the toolkit, and your **workflow records** (`workflows/`), pushed by `/dep-save` so the
+documentation is in this repo, not only on one machine. Never pushed: the clones (`repos/<name>/`), raw Snyk JSON,
+logs, and your personal settings. `repos/repos.txt` is tracked so the project ships an example. Once you add your own
+repos to it, don't commit it (`git status` shows it as modified), or keep it uncommitted with
+`git update-index --skip-worktree repos/repos.txt`.
 
 To change how a step works, edit its file in `toolkit/phases/`. Both assistants pick it up immediately.
 To add or rename a command, or change a handoff button, edit `tools/generate-entrypoints.py`, then run
@@ -634,8 +683,8 @@ powershell -ExecutionPolicy Bypass -File tests\run.ps1
 
 | You see | Meaning |
 |---------|---------|
-| `Ran 110 tests in …s` then `OK (skipped=23)` | **Everything works.** The 23 skipped are the 22 bash-version tests (bash isn't used on Windows) and the real-Maven test (step 5) |
-| `OK (skipped=26)` | Also fine: `javac` wasn't found, so the 3 app-boot tests were skipped. Install a JDK to run them |
+| `Ran … tests in …s` then **`OK (skipped=…)`** | **Everything works.** On Windows the skipped ones are the bash versions of the script tests (bash isn't used on Windows) and the real-Maven test (step 5). The exact numbers grow as tests are added |
+| `OK`, with 3 more skipped than usual | Also fine: `javac` wasn't found, so the 3 app-boot tests were skipped. Install a JDK to run them |
 | `FAILED (failures=…, errors=…)` | Something doesn't work on this machine. Each problem is listed above as a line starting with **`FAIL:`** or **`ERROR:`**, followed by the details |
 
 **5. Optional extra runs:**
@@ -669,7 +718,7 @@ You still see the output on screen, and `test-results.txt` holds a copy (it isn'
 |-----------|--------|
 | `test_repos.py` | Repos are cloned into `repos/` and refreshed only when clean. **Each workflow gets `deps/wf-NNN` from the latest main**, workflows don't overwrite each other's unpublished work, `release` returns to main. **Your own checkout is never touched** (branch, commit, files). No submodules; clones are never committed |
 | `test_workflows.py` | Workflow 1 = `wf-001`, Workflow 2 = `wf-002`, **ids never reused**. `1` / `wf-001` / folder name all resolve. Step states, next step, History and INDEX update correctly |
-| `test_snyk.py` | Every flagged package listed once with all its paths, severity totals, grouping by the dependency you edit, licence/no-fix rows, CSV. **Both scan scripts** handle a missing or not-logged-in CLI, `SNYK_CLI`, the VS Code extension's CLI and SSO logins, and scan each clone (or one workflow's repos) |
+| `test_snyk.py` | Every flagged package listed once with **every dependency path and the fix for each path** (upgrade / override / none, Snyk's remediation section), severity totals, grouping by the dependency you edit, licence/no-fix rows, CSV. **Both scan scripts** handle a missing or not-logged-in CLI, `SNYK_CLI`, the VS Code extension's CLI and SSO logins, and scan each clone (or one workflow's repos) |
 | `test_build_scripts.py` | **Both versions** of verify-repo and maven-facts: build results from JUnit files, failing tests named, build tool auto-detected (`mvnw` / `mvnw.cmd`), smoke boot catches "APPLICATION FAILED TO START", nothing left in the repo, Maven facts right |
 | `test_clone_hygiene.py` | End to end, with bash and with PowerShell: clone → scan → build leaves the clone with **no changed files and no commits**; all evidence lands in `workflows/<id>/` |
 | `test_ignore_dirs.py` | `target/`, `node_modules/`, `.git/` … are skipped by both shells' Snyk scan and pom discovery, don't count as uncommitted work, and are excluded in the Copilot and Claude settings |
@@ -705,6 +754,7 @@ every document must cite `file:line` or a source URL, and why nothing changes yo
 | The scan uses a different CLI than expected | It prints `Using Snyk CLI: <path>`. `SNYK_CLI` always wins over `snyk` on your PATH |
 | Snyk reports a different version than the inventory | Expected when the scan ran on another branch. See *Discrepancies* in `02-inventory.md` |
 | `/dep-clone` says "kept as is" or "expected main" | That repo has local changes or is on another branch. That's intentional: switch or commit yourself if needed |
+| `save` says `REFUSED: this repository is PUBLIC` | Make the repo private on GitHub (*Settings → General → Danger Zone → Change visibility*), then `/dep-save <id>` again |
 | `/dep-run` or `/dep-clone` says BLOCKED | Another workflow's changes in that clone aren't published yet. Publish or abandon that workflow, then run again |
 | Build red only when repos build in parallel | Shared `~/.m2` download clash. Re-run that repo: `/dep-verify <id> <repo>` |
 | `/dep-publish` stops | `gh auth status` must pass. For Bitbucket/GitLab it pushes and gives you the PR link instead |

@@ -4,7 +4,8 @@
 #
 # Usage: verify-repo.ps1 <repo-dir> <out-dir> [--smoke] [--build-cmd "<cmd>"]
 #   e.g. powershell -ExecutionPolicy Bypass -File toolkit\scripts\verify-repo.ps1 repos\inventory-service\backend out --smoke
-#   --smoke       after a green build, start the packaged jar on a random port and wait for "Started ... in"
+#   --smoke       (Spring Boot apps only) after a green build, start the packaged jar on a random port and wait for
+#                 Spring Boot's "Started ... in" line
 #   --build-cmd   override the auto-detected build command (Windows: mvnw.cmd / mvn / gradlew.bat / gradle)
 #
 # Outputs in <out-dir>: build.log, smoke.log, summary.json - nothing is written into the repo itself.

@@ -25,7 +25,9 @@
    - steps applied and deviations (from 04)
    - verification: tests before/after, smoke boot, Snyk before/after (from 05)
    - a "Review focus" list: behavioural changes with no compile error (from 03-impact)
+   - **"Known remaining issues"**: the Out of scope table from 03-plan (what, why, next step), so reviewers see what
+     this PR does not fix
 5. **Record** in `06-publish.md` and in the STATUS "Repos" PR column: commit SHA, PR URL, state.
 6. `python3 -I toolkit/scripts/workflows.py phase <id> 6 done`, with each PR URL logged via `log`. ▶ Next step: "review/merge the PRs. Afterwards: `python3 -I toolkit/scripts/repos.py --workflow <id> release`
    puts the clones back on main (the branch is kept)".
-   The workflow's own records stay local (git-ignored). The PR description is how the findings are shared.
+   Then `python3 -I toolkit/scripts/workflows.py save <id>` pushes the workflow's records to this project's repository.

@@ -44,7 +44,7 @@ orders-service     git@github.com:my-org/orders-service.git            branch=de
 | `git-url` | yes | The URL you'd give `git clone`: the green **Code** button on GitHub | `https://github.com/my-org/orders-service.git` |
 | `branch=` | no | The repo's main branch, if it isn't called `main`. Workflow branches start from it | `branch=develop` |
 | `path=` | no | Sub-folder with `pom.xml` / `build.gradle`, if not at the repo root | `path=backend` |
-| `smoke=true` | no | Also start the app during verification, to catch startup-only failures | `smoke=true` |
+| `smoke=true` | no | Spring Boot apps: also start the app during verification, to catch startup-only failures | `smoke=true` |
 | `build=` | no | Your own build command, if the default doesn't fit | `build="./mvnw -B -Pci verify"` |
 
 Or let the tools write the line:

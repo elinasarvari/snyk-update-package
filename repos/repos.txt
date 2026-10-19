@@ -6,7 +6,7 @@
 #   git-url the URL you'd give `git clone` (HTTPS or SSH)
 #   branch  the repo's main branch, if it isn't called `main`
 #   path    sub-folder that holds pom.xml / build.gradle  (default: the repo root)
-#   smoke   also start the app during verification and wait for "Started ... in"
+#   smoke   (Spring Boot apps) also start the app during verification and wait for its "Started ... in" line
 #   build   your own build command  (default: ./mvnw -B clean verify  or  ./gradlew clean build)
 #
 # Every repo is cloned into repos/<name>/ and the changes happen there, on branch deps/wf-NNN

@@ -29,13 +29,13 @@ version is set in the pom, and what else moves with it. Then take a **baseline**
    Any mismatch with the report (e.g. Snyk says 3.5.16, the repo resolves 3.3.2) goes under
    **Discrepancies**, with the likely reason (other branch, stale scan).
 6. **What moves with it:** if the lever is a platform parent/BOM, fetch the target's managed versions
-   (e.g. `spring-boot-dependencies-<target>.pom` on Maven Central). List every dependency in the
+   from that BOM's POM on Maven Central (e.g. `spring-boot-dependencies-<target>.pom` for Spring Boot). List every dependency in the
    tree whose version changes (now → after), with its jump type.
 7. **Coupled dependencies:** list every third-party BOM/starter the lever does *not* manage (Camel,
    springdoc, Testcontainers, Lombok, MapStruct, cloud SDKs...). For each: version now, whether it
-   supports the target, and the minimum version that does, with evidence. Camel tip: the
-   `<spring-boot-version>` property in `org.apache.camel:camel-parent:<v>` on Maven Central tells you
-   which Boot version that Camel release is built against.
+   supports the target, and the minimum version that does, with evidence: the library's compatibility matrix or its own
+   parent POM on Maven Central (example: the `<spring-boot-version>` property in `org.apache.camel:camel-parent:<v>`
+   says which Spring Boot line that Camel release is built against).
 8. **Baseline:** for each repo, on its current branch, in parallel, run
    `bash toolkit/scripts/verify-repo.sh <build_dir> workflows/<id>/verification/baseline/<name> <verify_args>`.
    Record the results in 02-inventory "Baseline" and the STATUS "Repos" table.

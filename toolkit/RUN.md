@@ -59,5 +59,6 @@ Stopped because:   <the stop reason, one line>
                    <and the command to continue, e.g. /dep-run <repo>>
 ```
 
-Before replying, run `W next <id> "<the same next step>"` so `STATUS.md` and `workflows/INDEX.md` show the same thing.
+Before replying, run `W next <id> "<the same next step>"` so `STATUS.md` and `workflows/INDEX.md` show the same thing,
+then `W save <id>` so the records are pushed (`toolkit/SAVE.md`; if it refuses because the repo is public, say so).
 Link the documents produced in this run, and keep the headline findings to a few bullets.

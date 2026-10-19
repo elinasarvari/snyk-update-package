@@ -17,13 +17,21 @@ Usage (from the project root):
     python3 -I toolkit/scripts/workflows.py index                # rebuild workflows/INDEX.md
     python3 -I toolkit/scripts/workflows.py show <ref>           # one run: steps, next step, repos in scope
     python3 -I toolkit/scripts/workflows.py find-open --repo NAME   # unfinished run scoped to exactly that repo
+    python3 -I toolkit/scripts/workflows.py save <ref> [--allow-public] [--no-push]
+        -> commit that workflow's records (only them) and push to this project's GitHub; refuses while the repo
+           is public unless --allow-public. Raw Snyk JSON and logs are never committed (.gitignore).
+    python3 -I toolkit/scripts/workflows.py sync                # pull the latest records (before starting a run)
 Written for Python 3.9 - stdlib only.
 """
 import argparse
 import datetime
+import json
 import os
 import re
+import subprocess
 import sys
+import urllib.error
+import urllib.request
 
 for _stream in (sys.stdout, sys.stderr):        # Windows consoles default to a legacy code page
     if hasattr(_stream, "reconfigure"):
@@ -195,8 +203,109 @@ def scoped_repos(path):
     return sorted(manifest_lines(own)) if os.path.isfile(own) else None
 
 
+# --- saving records to git -------------------------------------------------------------------
+def git(args):
+    proc = subprocess.run(["git"] + args, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          universal_newlines=True, encoding="utf-8", errors="replace")
+    return proc.returncode, proc.stdout.strip()
+
+
+def has_origin():
+    return git(["rev-parse", "--is-inside-work-tree"])[0] == 0 and git(["remote", "get-url", "origin"])[0] == 0
+
+
+def repo_visibility():
+    """public | private | unknown - from the GitHub API for origin. SUP_REPO_VISIBILITY overrides (tests, other hosts)."""
+    override = os.environ.get("SUP_REPO_VISIBILITY")
+    if override:
+        return override
+    code, url = git(["remote", "get-url", "origin"])
+    m = re.match(r"^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+)/([^/]+?)(?:\.git)?/?$", url)
+    if code != 0 or not m:
+        return "unknown"
+    try:
+        with urllib.request.urlopen("https://api.github.com/repos/%s/%s" % m.groups(), timeout=10) as resp:
+            return "private" if json.load(resp).get("private") else "public"
+    except urllib.error.HTTPError as err:
+        return "private" if err.code == 404 else "unknown"      # 404: not visible without signing in
+    except (urllib.error.URLError, OSError, ValueError):
+        return "unknown"
+
+
+def sync_with_origin():
+    """Bring in records pushed from other machines. -> (ok, message). INDEX.md conflicts are rebuilt, others abort."""
+    if not has_origin():
+        return True, "no git remote - nothing to sync"
+    code, out = git(["pull", "--rebase", "--autostash", "--quiet"])
+    if code == 0:
+        return True, "up to date with origin"
+    for _ in range(20):                                   # resolve generated-index conflicts, one commit at a time
+        _, conflicted = git(["diff", "--name-only", "--diff-filter=U"])
+        files = [f for f in conflicted.splitlines() if f]
+        if not files or any(f != "workflows/INDEX.md" for f in files):
+            break
+        rebuild_index()
+        git(["add", "workflows/INDEX.md"])
+        code, out = git(["-c", "core.editor=true", "rebase", "--continue"])
+        if code == 0:
+            return True, "synced (rebuilt workflows/INDEX.md)"
+    git(["rebase", "--abort"])
+    return False, "could not sync with origin automatically - resolve it with git, then save again:\n" + out
+
+
+def cmd_sync(_args):
+    ok, msg = sync_with_origin()
+    print(msg)
+    sys.exit(0 if ok else 1)
+
+
+def cmd_save(args):
+    wf = resolve(args.ref)
+    if not has_origin() and not args.no_push:
+        sys.exit("this project has no git remote 'origin' - nothing to push to (use --no-push to only commit)")
+    if not args.no_push and not args.allow_public:
+        visibility = repo_visibility()
+        if visibility == "public":
+            sys.exit("REFUSED: this repository is PUBLIC, and workflow records list your repos and their open\n"
+                     "vulnerabilities. Make it private on GitHub (Settings > General > Danger Zone > Change visibility),\n"
+                     "then save again - or run with --allow-public if publishing them is really intended.")
+        if visibility == "unknown":
+            print("Note: couldn't check whether the repository is public (not GitHub, or offline) - saving anyway.")
+    rebuild_index()
+    paths = [rel(wf[3]), "workflows/INDEX.md"] + (["workflows/_research"] if os.path.isdir(
+        os.path.join(WORKFLOWS_DIR, "_research")) else [])
+    git(["add", "-A", "--"] + paths)                      # .gitignore keeps raw Snyk JSON and logs out
+    code, staged = git(["diff", "--cached", "--name-only", "--"] + paths)
+    if staged:
+        info = parse_status(status_path(wf))
+        cur = current_phase(info["phases"])
+        where = "all steps done" if cur is None else "step %d %s" % (cur["n"], cur["name"])
+        title = re.sub(r"^(Workflow \d+:|Upgrade:)\s*", "", info["title"])
+        code, out = git(["commit", "--quiet", "-m", "workflow %s: %s (%s)" % (wf[1], title, where), "--"] + paths)
+        if code != 0:
+            sys.exit("commit failed:\n" + out)
+        print("committed %d file(s) for %s" % (len(staged.splitlines()), wf[1]))
+    else:
+        print("%s: nothing new to commit" % wf[1])
+    if args.no_push:
+        return
+    ok, msg = sync_with_origin()
+    if not ok:
+        sys.exit(msg)
+    code, out = git(["push", "--quiet", "origin", "HEAD"])
+    if code != 0:
+        sys.exit("push failed:\n" + out)
+    _, url = git(["remote", "get-url", "origin"])
+    print("pushed %s to %s" % (rel(wf[3]), re.sub(r"https://[^@/]+@", "https://", url)))
+
+
 def cmd_new(args):
     slug = slugify(args.slug)
+    if has_origin():                                      # take ids already pushed from other machines into account
+        ok, msg = sync_with_origin()
+        if not ok:
+            print("Note: " + msg.splitlines()[0] + " - the new workflow id may clash with one pushed elsewhere",
+                  file=sys.stderr)
     wanted = args.repo or []
     if wanted:
         known = manifest_lines(MANIFEST)
@@ -342,6 +451,9 @@ def main():
     p = sub.add_parser("show"); p.add_argument("ref"); p.set_defaults(func=cmd_show)
     p = sub.add_parser("find-open"); p.add_argument("--repo", action="append", required=True)
     p.set_defaults(func=cmd_find_open)
+    p = sub.add_parser("save"); p.add_argument("ref"); p.add_argument("--allow-public", action="store_true")
+    p.add_argument("--no-push", action="store_true"); p.set_defaults(func=cmd_save)
+    p = sub.add_parser("sync"); p.set_defaults(func=cmd_sync)
     args = parser.parse_args()
     args.func(args)
 

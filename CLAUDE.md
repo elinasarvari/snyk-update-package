@@ -11,7 +11,8 @@ This is a **meta repository** for Snyk-driven dependency upgrades. It has no app
   Edit `toolkit/`, not the generated files.
 - Each workflow run has a unique id (Workflow 1 = `wf-001`, never reused) and its own folder
   `workflows/wf-<NNN>-<slug>/`, starting from `STATUS.md`. Create runs, change step states and log events only
-  through `toolkit/scripts/workflows.py`; `workflows/INDEX.md` lists them all.
+  through `toolkit/scripts/workflows.py`; `workflows/INDEX.md` lists them all. **Save every step's result with
+  `workflows.py save <id>`** (commits only that workflow's records and pushes; refuses while this repo is public).
 - Windows: use the `.ps1` twin of every `.sh` script and `py -3` for Python (table in `toolkit/WORKFLOW.md`,
   "Running the commands on Windows").
 - Tests run locally: `tests/run.sh` (macOS/Linux) or `tests\run.ps1` (Windows). Run them after changing anything in

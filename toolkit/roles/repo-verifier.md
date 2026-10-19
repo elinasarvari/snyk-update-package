@@ -14,9 +14,9 @@ You verify one repository and explain the result. You do not fix anything.
 
 1. Run `bash <script> <repo> <out_dir> <args>` (timeout ≥ 10 min). Exit codes:
    0 green · 1 build/tests failed · 2 smoke failed · 3 unsupported repo.
-2. Read `summary.json`. If not green, read the **first** errors in `build.log` /
-   `smoke.log` (grep `[ERROR]`, `Caused by`, `APPLICATION FAILED TO START`,
-   `FAILED`) — the first cause, not the cascade.
+2. Read `summary.json`. If not green, get the **first** errors with
+   `python3 -I toolkit/scripts/script-helpers.py first-errors <out_dir>/build.log 40` (and the same for `smoke.log`):
+   the first cause, not the cascade. Don't open whole logs.
 3. For each failure decide:
    - **regression** — appears now, not in `baseline` (or no baseline and clearly tied to
      the upgrade, e.g. `ClassNotFoundException` for a relocated package);

@@ -30,15 +30,18 @@ upgraded in isolation. Read-only.
    `python3 -I toolkit/scripts/parse-snyk.py workflows/<id>/snyk/*.json --md workflows/<id>/snyk/findings.md --json workflows/<id>/snyk/findings.json --csv workflows/<id>/snyk/findings.csv`
    For pasted output, build the same tables by hand using the columns in `templates/01-snyk-findings.md`.
    A supplied JSON file is first copied into `workflows/<id>/snyk/`.
-5. **Write `01-snyk-findings.md`** from the template: scan summary, table 1 (every flagged package,
-   one row per `package@version`), table 2 (changes grouped by the direct dependency to edit). Then
-   triage each table-2 row into a bucket:
-   - **platform:** managed by a parent/BOM already in the pom (Spring Boot, Spring Cloud, Camel BOM,
-     Jackson BOM...). Many rows collapse into **one** lever bump; name the lever.
-   - **direct:** a version declared in the pom; bump it.
-   - **transitive-pin:** no upgrade path through its parent. Needs a `<dependencyManagement>`
-     override, which is risky; call it out.
-   - **no-fix / license:** nothing to upgrade to; needs a decision (accept, replace, or ignore with a reason).
+5. **Write `01-snyk-findings.md`** from the template, using `snyk/findings.md`: the scan summary, table 1 (every
+   flagged package with its **status**), table 2 (the changes, each with its **fix** type), and the **detailed
+   paths** (section 3: every path each package arrives by, with the fix for that path). Then triage table 2:
+   - **upgrade, platform:** the dependency is managed by a parent/BOM already in the pom. Many rows collapse into
+     **one** lever bump; name the lever.
+   - **upgrade, direct:** a version declared in the pom; bump it.
+   - **override:** Snyk has no upgrade path, but a fixed version exists (or Snyk suggests a pin). The vulnerable package
+     itself gets forced to that version (`<dependencyManagement>` / Gradle constraints). Compatibility is checked in step 3.
+   - **none:** no remediation on that path. It's examined in step 3 (newer introducing library, exclusion) before
+     anything is declared out of scope.
+   A package whose status is **needs an override** or **partly fixable** has paths that the obvious upgrade does
+   **not** fix: call those out, since they're the ones that get missed.
 6. **Close out:** `python3 -I toolkit/scripts/workflows.py phase <id> 1 done`, then `python3 -I toolkit/scripts/workflows.py next <id> "..."`. ▶ Next step: "pick the scope (`all`, a severity floor such as
    `high+`, or specific rows), then `/dep-inventory <id>`". Reply with the severity totals, the
    triaged table 2, and the next step.
