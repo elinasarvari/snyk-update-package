@@ -38,6 +38,11 @@ Requires phase 2 ✅. Read-only. Writes `03-impact.md` and `03-plan.md`.
         the package, or whether it can be **excluded** (`<exclusions>`) because nothing in the repo uses it
         (`git grep` for its packages/classes);
      4. only when 1–3 are exhausted does the path go to **Out of scope**, saying what was tried.
+   - **Vulnerable modules, itemized:** copy `snyk/vulnerable-modules.md` into the plan's *Vulnerable modules* section
+     (regenerate it with `parse-snyk.py … --modules` if the scope changed) and **fill in the Decision table of every
+     module**: in scope or not, fix chosen, target version, plan step(s), compatibility/risk (cite 03-impact.md), how
+     it's verified. A module out of scope says so and points to its *Out of scope* row. Never drop a module or an
+     issue row: the list must match the scan.
    - **Path coverage table:** for each in-scope package, list each path and the plan step that fixes it, or "out of
      scope". A package counts as fixed only when all its paths are.
    - Give exact diffs for pom/config edits, and precise descriptions with `path:line` for code edits.

@@ -270,6 +270,12 @@ class RemediationAndScope(unittest.TestCase):
         self.assertIn("## Path coverage", plan)
         self.assertIn("| # | What | Kind | Paths affected | Remediation tried | Why not now | Next step / owner |", plan)
 
+    def test_plan_itemizes_every_vulnerable_module(self):
+        self.assertIn("--modules workflows/<id>/snyk/vulnerable-modules.md", read("toolkit/phases/1-scan.md"))
+        self.assertIn("Vulnerable modules, itemized", read("toolkit/phases/3-analyze.md"))
+        self.assertIn("## Vulnerable modules", read("toolkit/templates/03-plan.md"))
+        self.assertIn("## Vulnerable modules: before → after", read("toolkit/templates/05-verification.md"))
+
     def test_findings_show_fix_types_and_detailed_paths(self):
         self.assertIn("## 3. Detailed paths", read("toolkit/templates/01-snyk-findings.md"))
         self.assertIn("**detailed\n   paths**", read("toolkit/phases/1-scan.md"))

@@ -15,7 +15,10 @@ report has it, the project-level `remediation` section (upgrade / pin / patch / 
 
 Usage:
     python3 -I parse-snyk.py <report.json> [more.json ...]
-                             [--md out.md] [--json out.json] [--csv out.csv]
+                             [--md out.md] [--json out.json] [--csv out.csv] [--modules out.md]
+
+--modules writes the "Vulnerable modules" section for 03-plan.md: one itemized entry per vulnerable
+module (facts, every Snyk issue, every path) with the decision fields left for the plan to fill in.
 
 Accepts both shapes Snyk emits: a single project object, or a list (`--all-projects`).
 Written for Python 3.9 - no match statements or `X | None`.
@@ -143,12 +146,20 @@ def collect(projects):
 
             pkg = packages.setdefault("%s@%s" % (pkg_name, pkg_version), {
                 "package": pkg_name, "version": pkg_version, "type": kind,
-                "max_severity": severity, "issues": [], "cves": [], "fixed_in": [],
+                "max_severity": severity, "issues": [], "issue_details": [], "cves": [], "fixed_in": [],
                 "introduced_via": [], "remediation": [], "projects": [], "direct": is_direct,
                 "paths": [], "fix_types": [],
             })
             pkg["max_severity"] = worse(severity, pkg["max_severity"])
             add_unique(pkg["issues"], "%s %s (%s)" % (vuln.get("id"), vuln.get("title", ""), severity))
+            if vuln.get("id") not in [d["id"] for d in pkg["issue_details"]]:
+                ids = vuln.get("identifiers") or {}
+                pkg["issue_details"].append({
+                    "id": vuln.get("id"), "title": vuln.get("title", ""), "severity": severity,
+                    "cvss": vuln.get("cvssScore"), "cves": list(ids.get("CVE") or []), "cwes": list(ids.get("CWE") or []),
+                    "exploit": vuln.get("exploit") or "", "fixed_in": list(vuln.get("fixedIn") or []),
+                    "url": vuln.get("url") or ("https://security.snyk.io/vuln/%s" % vuln.get("id") if vuln.get("id") else ""),
+                })
             for cve in (vuln.get("identifiers") or {}).get("CVE") or []:
                 add_unique(pkg["cves"], cve)
             for fixed in vuln.get("fixedIn") or []:
@@ -249,6 +260,47 @@ def to_markdown(packages, changes, totals, projects):
     return "\n".join(out) + "\n"
 
 
+def to_modules(packages):
+    """The itemized "Vulnerable modules" section of 03-plan.md. Facts are filled in; decisions are {{placeholders}}."""
+    out = ["## Vulnerable modules", "",
+           "One entry per vulnerable module, generated from the Snyk scan, so none can be missed. The plan fills in the",
+           "**Decision** table of every module in scope; a module left out of scope says so and points to its row in",
+           "*Out of scope*.", ""]
+    for n, p in enumerate(packages, 1):
+        lic = " (licence)" if p["type"] == "license" else ""
+        out += ["### %d. `%s@%s`%s" % (n, p["package"], p["version"], lic), "",
+                "| Fact | Value |", "|------|-------|",
+                "| Current version | %s |" % p["version"],
+                "| Highest severity | %s |" % p["max_severity"],
+                "| Status (from Snyk) | %s |" % p["status"],
+                "| Fixed in | %s |" % (", ".join(p["fixed_in"]) or "no fixed version"),
+                "| Dependency paths | %d (listed below) |" % len(p["paths"]),
+                "| Introduced via | %s |" % ("direct dependency" if p["direct"] else
+                                            ", ".join("`%s`" % v for v in p["introduced_via"])),
+                "| Projects | %s |" % ", ".join(p["projects"]), "",
+                "**Issues**", "",
+                "| Snyk issue | Title | Severity | CVSS | CVE | CWE | Exploit | Fixed in |",
+                "|------------|-------|----------|------|-----|-----|---------|----------|"]
+        for d in p["issue_details"]:
+            out.append("| [%s](%s) | %s | %s | %s | %s | %s | %s | %s |" % (
+                d["id"], d["url"], d["title"].replace("|", "/"), d["severity"],
+                d["cvss"] if d["cvss"] is not None else "-", ", ".join(d["cves"]) or "-", ", ".join(d["cwes"]) or "-",
+                d["exploit"] or "-", ", ".join(d["fixed_in"]) or "-"))
+        out += ["", "**Paths**", "", "| # | Path | Snyk's fix for this path |", "|---|------|--------------------------|"]
+        for i, entry in enumerate(p["paths"][:MAX_PATHS_SHOWN], 1):
+            out.append("| %d | %s | %s |" % (i, " › ".join("`%s`" % c for c in entry["path"]), entry["remediation"]))
+        if len(p["paths"]) > MAX_PATHS_SHOWN:
+            out.append("| | _… %d more paths in snyk/findings.json_ | |" % (len(p["paths"]) - MAX_PATHS_SHOWN))
+        out += ["", "**Decision**", "", "| | |", "|---|---|",
+                "| In scope? | {{yes / no: see Out of scope #n}} |",
+                "| Fix chosen | {{upgrade `<dependency>` / override / newer introducing library / exclude / out of scope}} |",
+                "| Target version | {{version the module ends up at}} |",
+                "| Plan step(s) | {{Step n, …: every path above is covered}} |",
+                "| Compatibility / risk | {{what could break, with evidence from 03-impact.md}} |",
+                "| Verified by | {{Snyk re-scan shows the issues gone · tests · smoke boot}} |", ""]
+    return "\n".join(out)
+
+
 def write_csv(path, packages):
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
@@ -267,6 +319,7 @@ def main():
     parser.add_argument("--md", dest="md_out")
     parser.add_argument("--json", dest="json_out")
     parser.add_argument("--csv", dest="csv_out")
+    parser.add_argument("--modules", dest="modules_out")
     args = parser.parse_args()
 
     projects = load_projects(args.reports)
@@ -280,6 +333,9 @@ def main():
             json.dump({"totals": totals, "packages": packages, "changes": changes}, fh, indent=2)
     if args.csv_out:
         write_csv(args.csv_out, packages)
+    if args.modules_out:
+        with open(args.modules_out, "w", encoding="utf-8") as fh:
+            fh.write(to_modules(packages))
     sys.stdout.write(markdown)
     print("\n%d flagged packages, %d direct changes, across %d projects."
           % (len(packages), len(changes), len(projects)), file=sys.stderr)

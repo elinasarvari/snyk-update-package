@@ -23,7 +23,8 @@ Build, test and boot every target repo. Also usable on its own as a health check
 5. **Re-scan (if the Snyk CLI is available):** run phase 1 step 3 into `workflows/<id>/snyk-after/` and parse
    it. Add "Snyk findings before → after" to the report. This proves the targeted issues are gone and
    that nothing new came in. **Every finding still open must be in `03-plan.md` → Out of scope.** Any other one (a
-   path the plan meant to fix, or a new finding) is a regression: list it under Failures.
+   path the plan meant to fix, or a new finding) is a regression: list it under Failures. Fill in the report's
+   *Vulnerable modules: before → after* table, one row per module and issue from 03-plan.
 6. **Clone hygiene:** if any `summary.json` has a non-empty `left_in_repo`, list those files under Failures as
    `environmental` (the build writes outside `target/`). They are never committed: publish stages only the plan's files.
 7. **Assemble `05-verification.md`:** the Result table, a Failures section per red repo (regression /

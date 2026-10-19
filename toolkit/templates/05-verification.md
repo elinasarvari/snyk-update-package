@@ -11,6 +11,14 @@
 "vs. baseline" compares against the same repo before the upgrade — a test that was already
 failing on the original branch is a pre-existing failure, not a regression.
 
+## Vulnerable modules: before → after
+
+One row per module and Snyk issue from 03-plan *Vulnerable modules*, checked against the Snyk re-scan.
+
+| Module | Snyk issue | Severity | Before | After | Result |
+|--------|-----------|----------|--------|-------|--------|
+| `{{group:artifact}}` | {{SNYK-…}} | {{high}} | {{1.33, open}} | {{2.0, gone}} | {{✅ fixed / ➖ out of scope (as planned) / ⛔ still open, not planned}} |
+
 ## Failures
 
 ### {{repo}}

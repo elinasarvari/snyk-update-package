@@ -27,7 +27,8 @@ upgraded in isolation. Read-only.
    - Per-repo results are in `snyk/scan-index.tsv`: 0 clean, 1 findings, 2 failed, 3 no supported
      project. A failed repo is reported, never silently dropped.
 4. **Summarise all findings:**
-   `python3 -I toolkit/scripts/parse-snyk.py workflows/<id>/snyk/*.json --md workflows/<id>/snyk/findings.md --json workflows/<id>/snyk/findings.json --csv workflows/<id>/snyk/findings.csv`
+   `python3 -I toolkit/scripts/parse-snyk.py workflows/<id>/snyk/*.json --md workflows/<id>/snyk/findings.md --json workflows/<id>/snyk/findings.json --csv workflows/<id>/snyk/findings.csv --modules workflows/<id>/snyk/vulnerable-modules.md`
+   (`vulnerable-modules.md` is the itemized list of every vulnerable module that the plan in step 3 fills in.)
    For pasted output, build the same tables by hand using the columns in `templates/01-snyk-findings.md`.
    A supplied JSON file is first copied into `workflows/<id>/snyk/`.
 5. **Write `01-snyk-findings.md`** from the template, using `snyk/findings.md`: the scan summary, table 1 (every

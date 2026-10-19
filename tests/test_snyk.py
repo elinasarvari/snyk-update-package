@@ -178,6 +178,31 @@ class RemediationAndPaths(Sandbox):
         self.assertIn("… 5 more paths in findings.json", md)
 
 
+class VulnerableModules(Sandbox):
+    """--modules: the itemized "Vulnerable modules" section of the plan, generated so nothing can be missed."""
+
+    def test_every_module_issue_and_path_is_itemized_with_decision_fields(self):
+        yaml1 = vuln("SNYK-YAML-1", "org.yaml:snakeyaml", "1.33", "high",
+                     [APP, "org.springframework.boot:spring-boot-starter@3.0.0", "org.yaml:snakeyaml@1.33"],
+                     [False, "org.springframework.boot:spring-boot-starter@3.2.0"], ["2.0"], ["CVE-2022-1471"])
+        yaml1.update({"cvssScore": 8.3, "exploit": "Proof of Concept", "identifiers": {"CVE": ["CVE-2022-1471"], "CWE": ["CWE-502"]}})
+        yaml2 = vuln("SNYK-YAML-2", "org.yaml:snakeyaml", "1.33", "medium",
+                     [APP, "com.acme:legacy-config@1.0", "org.yaml:snakeyaml@1.33"], [], ["1.34"], ["CVE-2022-38749"],
+                     upgradable=False)
+        report = self.write("in/r.json", json.dumps({"projectName": "com.example:app", "vulnerabilities": [yaml1, yaml2, H2, NOFIX]}))
+        out = os.path.join(self.root, "modules.md")
+        self.script("parse-snyk.py", report, "--modules", out, check=True)
+        md = self.read(out)
+        self.assertEqual(md.count("\n### "), 3, "one entry per vulnerable module")
+        for issue in ("SNYK-YAML-1", "SNYK-YAML-2", "SNYK-H2-3", "SNYK-NOFIX-4"):
+            self.assertIn("[%s](https://security.snyk.io/vuln/%s)" % (issue, issue), md, "every issue, linked")
+        self.assertIn("| 8.3 | CVE-2022-1471 | CWE-502 | Proof of Concept | 2.0 |", md)
+        self.assertIn("| Dependency paths | 2 (listed below) |", md)
+        self.assertIn("`com.acme:legacy-config@1.0` › `org.yaml:snakeyaml@1.33`", md)
+        self.assertIn("| Fixed in | no fixed version |", md)
+        self.assertEqual(md.count("| Fix chosen | {{"), 3, "a decision table to fill in for every module")
+
+
 class SnykScanTests:
     """snyk-scan.sh / snyk-scan.ps1 with a fake `snyk` CLI (a small Python program)."""
 

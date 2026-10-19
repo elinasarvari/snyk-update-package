@@ -607,11 +607,11 @@ workflows/wf-001-spring-boot-4-1/
 ├── 01-snyk-findings.md     every flagged package, the changes (upgrade / override), every dependency path
 ├── 02-inventory.md         current vs target, what moves with it, coupled libraries, baseline
 ├── 03-impact.md            what breaks, where (file:line), with sources
-├── 03-plan.md              ordered steps with exact diffs, which step fixes each path, out of scope, approval
+├── 03-plan.md              every vulnerable module itemized + decision, ordered steps, path coverage, out of scope, approval
 ├── 04-apply-log.md         what changed per step, deviations from the plan
 ├── 05-verification.md      build/test/boot results per repo, before vs after, verdict
 ├── 06-publish.md           commits and PR links
-├── snyk/                   raw Snyk JSON per repo, findings.{md,csv,json}
+├── snyk/                   raw Snyk JSON per repo, findings.{md,csv,json}, vulnerable-modules.md
 ├── facts/<repo>/           resolved dependency tree, declared deps, version properties
 ├── analysis/<repo>--<artifact>.md   full report from each analyst subagent
 └── verification/{baseline,after}/<repo>/summary.json, diagnosis.md
