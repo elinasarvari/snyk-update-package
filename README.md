@@ -155,6 +155,86 @@ and where it stands, open [`workflows/INDEX.md`](workflows/INDEX.md) or run **`/
 
 **6. Read the results** in `workflows/<id>/`. Start with `STATUS.md`.
 
+One git repo with several Java projects inside? See **[Monorepos, step by step](#monorepos-one-git-repo-several-projects-step-by-step)**.
+
+---
+
+## Monorepos (one git repo, several projects), step by step
+
+A monorepo is listed **once**: one line in `repos.txt`, one clone, one branch `deps/wf-NNN` and one PR per
+workflow, covering every project inside it.
+
+**1. Check how your monorepo builds.** Open the `pom.xml` at the **root** of the repo (your own checkout, or
+`repos/<name>/` if it's already cloned) and look for `<module>` lines:
+
+| | macOS | Windows (PowerShell) |
+|---|---|---|
+| Count the modules | `grep -c '<module>' ~/repos/my-monorepo/pom.xml` | `(Select-String -Path $HOME\repos\my-monorepo\pom.xml -Pattern '<module>').Count` |
+
+| You see | Your case | Supported? |
+|---------|-----------|------------|
+| A number (e.g. `4`): the root `pom.xml` lists the projects as modules | **A: one multi-module build** | ✅ Yes, continue below |
+| `0`, or "no such file": there is no root `pom.xml`, each project builds on its own | **B: separate builds** | ❌ Not yet. One line can name only one build folder (`path=`), and listing the same repo several times would clone it several times and clash at publish. Ask for multi-folder support (`path=a,b,c`) |
+
+**2. Add it to the list** (once), with no `path=` and no `smoke=true`:
+
+```bash
+python3 -I toolkit/scripts/repos.py add https://github.com/my-org/my-monorepo.git my-monorepo
+```
+
+```powershell
+py -3 -I toolkit\scripts\repos.py add https://github.com/my-org/my-monorepo.git my-monorepo
+```
+
+This writes one line to [`repos/repos.txt`](repos/repos.txt):
+
+```text
+my-monorepo  https://github.com/my-org/my-monorepo.git
+```
+
+- Main branch not called `main`? Add `branch=<name>` to the line.
+- Already cloned into `repos/`? Use the **exact folder name** as the name, so the clone is reused.
+- **Don't add `smoke=true`.** The app-start check looks for the jar in the root `target/`, but in a multi-module
+  build each app's jar is inside its own module, so it would report a failure that isn't real.
+
+**3. Clone it and check it:**
+
+```bash
+python3 -I toolkit/scripts/repos.py clone my-monorepo
+python3 -I toolkit/scripts/repos.py status
+```
+
+```powershell
+py -3 -I toolkit\scripts\repos.py clone my-monorepo
+py -3 -I toolkit\scripts\repos.py status
+```
+
+**4. Run the workflow** in chat: **`/dep-run my-monorepo`**. It covers every project in the repo:
+
+| Step | What it reads in the monorepo |
+|------|-------------------------------|
+| Snyk scan | Every `pom.xml` (`--all-projects`). Each finding names the project and `pom.xml` it came from |
+| Inventory | Every `pom.xml`'s declared dependencies and version properties, and every module's dependency tree |
+| Impact + plan | Code, config and tests across the whole repo. The plan's *Vulnerable modules* lists each project's findings |
+| Apply | Edits on `deps/wf-NNN`, in the root `pom.xml` (shared versions) or a module's `pom.xml`, as the plan says |
+| Verify | One build of the whole reactor from the root. Test results are counted from **every** module (each failing test is named, as `<test class>#<test>`) |
+| Publish | One branch, one PR for the whole monorepo |
+
+Folders like `target/` and `node_modules/` are skipped everywhere (`toolkit/ignore-dirs.txt`).
+
+**Build and test it by hand (optional)**, the same check the verify step runs, from the monorepo's root:
+
+```bash
+bash toolkit/scripts/verify-repo.sh repos/my-monorepo /tmp/verify-my-monorepo
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File toolkit\scripts\verify-repo.ps1 repos\my-monorepo $env:TEMP\verify-my-monorepo
+```
+
+It prints the first errors if the build fails, and writes `summary.json` with the test counts of every module
+(`"tests": {"tests": …, "failures": …, "failed_tests": [...]}`), plus `build.log`.
+
 ---
 
 ## Reviewing the plan: vulnerable modules, step by step
@@ -782,7 +862,7 @@ workflows/wf-001-spring-boot-4-1/
 | `toolkit/scripts/snyk-scan.sh` | Snyk scan of every repo in the list | — |
 | `toolkit/scripts/parse-snyk.py` | Snyk JSON → findings tables + CSV | — |
 | `toolkit/scripts/maven-facts.sh` | What a repo's pom really resolves | — |
-| `toolkit/scripts/verify-repo.sh` | Build → tests → boot → `summary.json` | — |
+| `toolkit/scripts/verify-repo.sh` / `.ps1` | Build → tests → boot → `summary.json` (bash / Windows PowerShell, same arguments and output) | — |
 | `.github/prompts/`, `.github/agents/` | Copilot slash commands and agents (**generated**) | no, edit `toolkit/` and regenerate |
 | `.github/skills/dep-upgrade/SKILL.md`, `.github/copilot-instructions.md`, `.github/instructions/` | Copilot context and pom-editing rules | rarely |
 | `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` | Claude Code commands and subagents (**generated**, except `CLAUDE.md`) | no, regenerate |

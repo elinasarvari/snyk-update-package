@@ -11,10 +11,12 @@
 # Outputs in <out-dir>: build.log, smoke.log, summary.json - nothing is written into the repo itself.
 # The smoke boot runs with <out-dir> as its working folder. Files the build leaves in the repo that git doesn't
 # ignore are reported as "left_in_repo" (never deleted).
-# Exit code: 0 all green, 1 build/tests failed, 2 smoke failed, 3 unsupported repo, 64 bad arguments
+# Exit code: 0 all green, 1 build/tests failed, 2 smoke failed, 3 unsupported repo
+# (like verify-repo.sh: a missing <repo-dir>/<out-dir> exits 1, an unknown argument exits 64)
 . (Join-Path $PSScriptRoot 'common.ps1')
 
-if ($args.Count -lt 2) { Write-Err 'usage: verify-repo.ps1 <repo-dir> <out-dir> [--smoke] [--build-cmd "<cmd>"]'; exit 64 }
+if ($args.Count -lt 1) { Write-Err 'repo dir required'; exit 1 }
+if ($args.Count -lt 2) { Write-Err 'out dir required'; exit 1 }
 $repoArg = [string]$args[0]
 $out = [string]$args[1]
 $smoke = $false

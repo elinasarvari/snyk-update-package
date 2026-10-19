@@ -37,7 +37,8 @@ version is set in the pom, and what else moves with it. Then take a **baseline**
    parent POM on Maven Central (example: the `<spring-boot-version>` property in `org.apache.camel:camel-parent:<v>`
    says which Spring Boot line that Camel release is built against).
 8. **Baseline:** for each repo, on its current branch, in parallel, run
-   `bash toolkit/scripts/verify-repo.sh <build_dir> workflows/<id>/verification/baseline/<name> <verify_args>`.
+   `bash toolkit/scripts/verify-repo.sh <build_dir> workflows/<id>/verification/baseline/<name> <verify_args>`
+   (Windows: `powershell -ExecutionPolicy Bypass -File toolkit\scripts\verify-repo.ps1` with the same arguments).
    Record the results in 02-inventory "Baseline" and the STATUS "Repos" table.
 9. **Close out:** `python3 -I toolkit/scripts/workflows.py phase <id> 2 done`, or `blocked --note "<decision needed>"` if a
    discrepancy/blocker needs a user decision.

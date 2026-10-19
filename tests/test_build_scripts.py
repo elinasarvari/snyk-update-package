@@ -115,6 +115,14 @@ class VerifyRepoTests:
         proc, _ = self.verify(self.repo(), "--colour")
         self.assertEqual(proc.returncode, 64)
 
+    def test_missing_arguments_exit_1_with_the_same_message(self):
+        proc = self.script("verify-repo.sh")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("repo dir required", proc.stdout)
+        proc = self.script("verify-repo.sh", self.repo())
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("out dir required", proc.stdout)
+
     def test_maven_wrapper_is_auto_detected(self):
         repo = self.repo()
         if ON_WINDOWS:

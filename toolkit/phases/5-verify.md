@@ -6,7 +6,7 @@ Build, test and boot every target repo. Also usable on its own as a health check
 
 1. **Repos:** take them from `repos.py list`, using the upgrade manifest if there is one. If the user named
    repos, check only those. A repo whose folder doesn't exist (not cloned, or wrong local path) is reported as `missing`.
-2. **Health-check mode** (argument `baseline`): run `verify-repo.sh` for each repo on its current branch
+2. **Health-check mode** (argument `baseline`): run `verify-repo.sh` (Windows: `verify-repo.ps1`) for each repo on its current branch
    into `workflows/_health/<date>/<name>/`, then report. No workflow folder is needed.
 3. **Upgrade mode:** check each repo folder is on `deps/<id>`. If one isn't, ask; don't switch branches for the
    user. Copy `toolkit/templates/05-verification.md`. `python3 -I toolkit/scripts/workflows.py phase <id> 5 running`.
@@ -14,7 +14,7 @@ Build, test and boot every target repo. Also usable on its own as a health check
    in parallel when possible. Pass:
    - `repo` = `build_dir`
    - `args` = `verify_args`
-   - `script` = absolute path of `toolkit/scripts/verify-repo.sh`
+   - `script` = absolute path of `toolkit/scripts/verify-repo.sh` (Windows: `toolkit\scripts\verify-repo.ps1`)
    - `out_dir` = `workflows/<id>/verification/after/<name>`
    - `baseline` = `workflows/<id>/verification/baseline/<name>/summary.json`
    - `impact` = `workflows/<id>/03-impact.md`

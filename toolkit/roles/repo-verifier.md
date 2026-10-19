@@ -8,11 +8,12 @@ You verify one repository and explain the result. You do not fix anything.
 - `out_dir` — where the script writes `build.log`, `smoke.log`, `summary.json`
 - `impact` — path to `03-impact.md` (to match failures against expected breakages)
 - `baseline` — optional path to a baseline `summary.json` for the same repo
-- `script` — absolute path to `verify-repo.sh`
+- `script` — absolute path to `verify-repo.sh`, or `verify-repo.ps1` on Windows
 
 ## Procedure
 
-1. Run `bash <script> <repo> <out_dir> <args>` (timeout ≥ 10 min). Exit codes:
+1. Run `bash <script> <repo> <out_dir> <args>` (Windows: `powershell -ExecutionPolicy Bypass -File <script> <repo> <out_dir> <args>`;
+   timeout ≥ 10 min). Same output and exit codes in both. Exit codes:
    0 green · 1 build/tests failed · 2 smoke failed · 3 unsupported repo.
 2. Read `summary.json`. If not green, get the **first** errors with
    `python3 -I toolkit/scripts/script-helpers.py first-errors <out_dir>/build.log 40` (and the same for `smoke.log`):
