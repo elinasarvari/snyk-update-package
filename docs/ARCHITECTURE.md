@@ -9,6 +9,7 @@ below.
 - [3. One `/dep-run`, in order](#3-one-dep-run-in-order)
 - [4. Where every file lives](#4-where-every-file-lives)
 - [5. What each step reads and writes](#5-what-each-step-reads-and-writes)
+- [6. Monorepos: one git repo, several projects](#6-monorepos-one-git-repo-several-projects)
 
 ---
 
@@ -241,3 +242,46 @@ flowchart LR
 | 4 Apply | `03-plan.md` (approved) | code changes in the clone, `04-apply-log.md` |
 | 5 Verify | the clone, `verification/baseline/`, `03-impact.md` | `verification/after/`, `05-verification.md` |
 | 6 Publish | `04-apply-log.md`, `03-impact.md`, `05-verification.md` | a commit + PR in the repo, `06-publish.md` |
+
+---
+
+## 6. Monorepos: one git repo, several projects
+
+A monorepo is **one line, one clone, one branch, one PR**. It's supported when a root `pom.xml` lists the
+projects as `<module>`s (case A). Each step then covers every project. How to set it up:
+[README: Monorepos, step by step](../README.md#monorepos-one-git-repo-several-projects-step-by-step).
+
+```mermaid
+flowchart TB
+    check{"root pom.xml lists<br/>the projects as &lt;module&gt;s?"}
+    check -- "no (B: separate builds)" --> notyet["not supported yet<br/>(needs multi-folder path=a,b,c)"]
+    check -- "yes (A)" --> line["repos/repos.txt: ONE line<br/>my-monorepo &lt;git-url&gt;<br/>no path=, no smoke=true"]
+
+    line -->|"0 Clone, on deps/wf-NNN"| clone
+
+    subgraph clone["repos/my-monorepo/"]
+        direction TB
+        root["pom.xml (root: shared versions, &lt;module&gt;s)"]
+        m1["service-a/pom.xml"]
+        m2["service-b/pom.xml"]
+        m3["service-c/pom.xml"]
+        m4["service-d/pom.xml"]
+        skip["target/ · node_modules/ · .git/ …<br/>skipped everywhere (ignore-dirs.txt)"]
+        root --- m1 & m2 & m3 & m4
+    end
+
+    clone -->|"1 Scan: snyk --all-projects"| f1[/"one result per pom.xml<br/>each finding names its project + pom"/]
+    f1 -->|"2 Inventory"| f2[/"find-poms: every pom's declared deps + version properties<br/>dependency:tree for every module · baseline build"/]
+    f2 -->|"3 Impact + plan"| f3[/"code search across the whole repo<br/>plan itemizes every vulnerable module, per project"/]
+    f3 -->|"you approve, 4 Apply"| f4[/"edits the root pom (shared versions)<br/>or a module's pom, as planned"/]
+    f4 -->|"5 Verify"| f5[/"ONE reactor build from the root<br/>tests counted from EVERY module's reports<br/>(surefire · failsafe · Gradle)"/]
+    f5 -->|"6 Publish"| pr[("ONE branch (deps/wf-NNN)<br/>ONE PR for the whole monorepo")]
+```
+
+| Step | In a monorepo | Done by |
+|------|---------------|---------|
+| 1 Scan | Every `pom.xml`, one Snyk result each | `snyk-scan.sh` / `.ps1` (`--all-projects`, `--exclude` from `ignore-dirs.txt`) |
+| 2 Inventory | Every `pom.xml`, and every module's resolved tree | `maven-facts.sh` / `.ps1` → `script-helpers.py find-poms` |
+| 3 Impact + plan | The whole repo's code, config and tests | the procedure (`git grep`), `parse-snyk.py --into-plan` |
+| 5 Verify | One build of the whole reactor; test results from every module, `node_modules/` ignored | `verify-repo.sh` / `.ps1` → `script-helpers.py junit`; tested in both shells |
+| Smoke boot | Not for monorepos: it looks for the app's jar in the root `target/` only | leave out `smoke=true` |
