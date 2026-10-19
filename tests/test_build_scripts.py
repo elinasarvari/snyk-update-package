@@ -67,6 +67,25 @@ class VerifyRepoTests:
         self.assertEqual(summary["tests"]["failed_tests"], ["com.example.Broken#fails"])
         self.assertIn("[ERROR] Tests failed", proc.stdout, "prints the first errors from the log")
 
+    def test_multi_module_build_counts_every_modules_tests(self):
+        repo = self.repo()
+        build = self.write(os.path.join(self.tmp, "multi.py"), "\n".join([
+            "import os",
+            "def suite(mod, folder, tests, failing=None):",
+            "    d = os.path.join(mod, *folder.split('/')); os.makedirs(d, exist_ok=True)",
+            "    bad = '<testcase classname=\"%s.Broken\" name=\"fails\"><failure/></testcase>' % mod if failing else ''",
+            "    open(os.path.join(d, 'TEST-%s.xml' % mod), 'w').write('<testsuite name=\"%s\" tests=\"%d\" failures=\"%d\" errors=\"0\" skipped=\"0\">%s</testsuite>' % (mod, tests, 1 if failing else 0, bad))",
+            "suite('service-a', 'target/surefire-reports', 3)",
+            "suite('service-b', 'target/surefire-reports', 2, failing=True)",
+            "suite('service-c', 'target/failsafe-reports', 1)",
+            "suite('node_modules/some-lib', 'target/surefire-reports', 99)",   # must be ignored
+            "raise SystemExit(1)", ""]))
+        proc, summary = self.verify(repo, "--build-cmd", self.python_command(build))
+        self.assertEqual(summary["tests"]["tests"], 6, "3 + 2 + 1 across modules; node_modules ignored")
+        self.assertEqual(summary["tests"]["failures"], 1)
+        self.assertEqual(summary["tests"]["failed_tests"], ["service-b.Broken#fails"])
+        self.assertEqual(summary["status"], "build-failed")
+
     def test_a_clean_build_leaves_nothing_in_the_repo(self):
         repo = self.repo()
         proc, summary = self.verify(repo, "--build-cmd", self.fake_build())

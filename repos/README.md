@@ -68,6 +68,18 @@ In chat, `/dep-run <git-url>` (or `/dep-run ~/repos/orders-service`) adds it for
 - SSH uses your key (`ssh -T git@github.com` to test);
 - private repos need *your* account to have access.
 
+### Monorepos (one git repo, several projects)
+
+List the monorepo **once**: one line, one clone, one branch and one PR per workflow.
+
+| Your monorepo | The line | What's covered |
+|---------------|----------|----------------|
+| A root `pom.xml` lists the projects as `<module>`s | `my-monorepo  <git-url>` (no `path=`) | Everything: the Snyk scan finds every `pom.xml`, the inventory reads every `pom.xml` and every module's dependency tree, the build and tests run the whole reactor, and **every module's** test results are counted |
+| No root `pom.xml`, the projects build separately | *not supported yet*: one line can only name one build folder (`path=`), and listing the same repo several times would clone it several times and clash at publish | Ask for multi-folder support (`path=a,b,c`) |
+
+Don't add `smoke=true` to a monorepo line: the app-start check looks for the app's jar in the root `target/`, and in a
+multi-module build each app's jar is inside its own module.
+
 ## Step 2: Clone
 
 ```bash

@@ -59,7 +59,8 @@ $started = Get-Date
 $buildExit = Invoke-ShellCommand -Cwd $repo -CommandLine $buildCmd -Stdout $buildLog -Stderr $buildLog
 $duration = [int]((Get-Date) - $started).TotalSeconds
 
-$testsJson = (Invoke-Helper @('junit', 'target/surefire-reports', 'target/failsafe-reports', 'build/test-results')) -join ''
+# every module's JUnit reports (multi-module builds included)
+$testsJson = (Invoke-Helper @('junit')) -join ''
 
 $smokeStatus = 'skipped'
 if ($smoke -and $buildExit -eq 0) {

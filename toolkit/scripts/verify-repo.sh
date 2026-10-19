@@ -37,7 +37,6 @@ out=$(cd "$out" && pwd)
 cd "$repo" || { echo "cannot cd to $repo" >&2; exit 3; }
 repo=$(pwd)
 
-reports="target/surefire-reports target/failsafe-reports build/test-results"
 if [[ -z "$build_cmd" ]]; then
   if [[ -f pom.xml ]]; then
     if [[ -x ./mvnw ]]; then build_cmd="./mvnw -B clean verify"; else build_cmd="mvn -B clean verify"; fi
@@ -57,9 +56,8 @@ bash -c "$build_cmd" > "$out/build.log" 2>&1
 build_exit=$?
 duration=$(( $(date +%s) - start ))
 
-# Count test results from JUnit XML - more reliable than scraping console output.
-# shellcheck disable=SC2086
-tests_json=$(py junit $reports)
+# Count test results from JUnit XML - every module's reports (multi-module builds included).
+tests_json=$(py junit)
 
 smoke_status="skipped"
 if $smoke && [[ $build_exit -eq 0 ]]; then

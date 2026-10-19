@@ -4,7 +4,10 @@
 Anything that parses files or writes JSON lives here, once, so both shell versions behave
 identically and only differ in how they run processes. Python 3.9, stdlib only, any OS.
 
-    script-helpers.py junit <reports-dir> ...          -> JSON test totals from JUnit XML (TEST-*.xml)
+    script-helpers.py junit [<reports-dir> ...]        -> JSON test totals from JUnit XML (TEST-*.xml). Without dirs:
+                                                          every module's reports under the current folder
+                                                          (*/target/surefire-reports, */target/failsafe-reports,
+                                                          */build/test-results) - multi-module builds included
     script-helpers.py pom-declared <pom.xml>           -> one line per parent/managed/dependency/plugin
     script-helpers.py version-props <pom.xml>          -> <...version> entries of <properties>
     script-helpers.py project-java <pom.xml>           -> the <java.version> property, or empty
@@ -72,20 +75,39 @@ def run(cmd):
         return 127, ""
 
 
+REPORT_DIRS = ("target/surefire-reports", "target/failsafe-reports", "build/test-results")
+
+
+def report_files(dirs):
+    """TEST-*.xml in the given dirs, or - without dirs - in every module's report folders under the current one."""
+    if dirs:
+        for base in dirs:
+            for path in glob.glob(os.path.join(base, "**", "TEST-*.xml"), recursive=True):
+                yield path
+        return
+    skip = set(load_ignore_dirs()) - {"target", "build"}         # reports live in target/ and build/
+    for base, subdirs, files in os.walk("."):
+        subdirs[:] = [d for d in subdirs if d not in skip]
+        rel = "/" + base.replace(os.sep, "/").lstrip("./") + "/"        # e.g. /service-a/target/surefire-reports/
+        if any("/%s/" % rd in rel for rd in REPORT_DIRS):
+            for name in files:
+                if name.startswith("TEST-") and name.endswith(".xml"):
+                    yield os.path.join(base, name)
+
+
 def junit(dirs):
     totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
     failed = []
-    for base in dirs:
-        for path in glob.glob(os.path.join(base, "**", "TEST-*.xml"), recursive=True):
-            try:
-                suite = ET.parse(path).getroot()
-            except ET.ParseError:
-                continue
-            for key in totals:
-                totals[key] += int(suite.get(key, 0) or 0)
-            for case in suite.iter("testcase"):
-                if case.find("failure") is not None or case.find("error") is not None:
-                    failed.append("%s#%s" % (case.get("classname"), case.get("name")))
+    for path in report_files(dirs):
+        try:
+            suite = ET.parse(path).getroot()
+        except ET.ParseError:
+            continue
+        for key in totals:
+            totals[key] += int(suite.get(key, 0) or 0)
+        for case in suite.iter("testcase"):
+            if case.find("failure") is not None or case.find("error") is not None:
+                failed.append("%s#%s" % (case.get("classname"), case.get("name")))
     totals["failed_tests"] = failed[:50]
     print(json.dumps(totals))
 
