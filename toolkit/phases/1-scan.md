@@ -27,13 +27,16 @@ upgraded in isolation. Read-only.
    - Per-repo results are in `snyk/scan-index.tsv`: 0 clean, 1 findings, 2 failed, 3 no supported
      project. A failed repo is reported, never silently dropped.
 4. **Summarise all findings:**
-   `python3 -I toolkit/scripts/parse-snyk.py workflows/<id>/snyk/*.json --md workflows/<id>/snyk/findings.md --json workflows/<id>/snyk/findings.json --csv workflows/<id>/snyk/findings.csv --modules workflows/<id>/snyk/vulnerable-modules.md`
-   (`vulnerable-modules.md` is the itemized list of every vulnerable module that the plan in step 3 fills in.)
+   `python3 -I toolkit/scripts/parse-snyk.py workflows/<id>/snyk/*.json --md workflows/<id>/snyk/findings.md --json workflows/<id>/snyk/findings.json --csv workflows/<id>/snyk/findings.csv --modules workflows/<id>/snyk/vulnerable-modules.md --index workflows/<id>/snyk/module-index.md`
+   (`vulnerable-modules.md` itemizes every vulnerable module; `module-index.md` is the one-line-per-module summary the plan
+   step reads first. Quote the `*.json` as written: the script expands it itself, also on Windows.)
    For pasted output, build the same tables by hand using the columns in `templates/01-snyk-findings.md`.
    A supplied JSON file is first copied into `workflows/<id>/snyk/`.
-5. **Write `01-snyk-findings.md`** from the template, using `snyk/findings.md`: the scan summary, table 1 (every
-   flagged package with its **status**), table 2 (the changes, each with its **fix** type), and the **detailed
-   paths** (section 3: every path each package arrives by, with the fix for that path). Then triage table 2:
+5. **Write `01-snyk-findings.md`** from the template. Keep it short: **link** the generated tables, don't copy
+   them (`findings.md` and `vulnerable-modules.md` can run to many thousands of tokens). Fill in: the scan summary
+   (totals), the repos scanned, **table 2 triaged** (from `findings.md` section 2, the only section you need to read
+   in full), and the names of modules whose status is `needs an override`, `partly fixable` or `no fix`
+   (`grep -E 'needs an override|partly fixable|no fix' snyk/findings.md`). Triage table 2:
    - **upgrade, platform:** the dependency is managed by a parent/BOM already in the pom. Many rows collapse into
      **one** lever bump; name the lever.
    - **upgrade, direct:** a version declared in the pom; bump it.

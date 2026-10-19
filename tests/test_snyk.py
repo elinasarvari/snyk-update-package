@@ -2,6 +2,8 @@
 import csv
 import json
 import os
+import sys
+import re
 import stat
 
 from helpers import ON_WINDOWS, BashScripts, PowerShellScripts, Sandbox
@@ -200,7 +202,114 @@ class VulnerableModules(Sandbox):
         self.assertIn("| Dependency paths | 2 (listed below) |", md)
         self.assertIn("`com.acme:legacy-config@1.0` › `org.yaml:snakeyaml@1.33`", md)
         self.assertIn("| Fixed in | no fixed version |", md)
-        self.assertEqual(md.count("| Fix chosen | {{"), 3, "a decision table to fill in for every module")
+        self.assertEqual(md.count("| Plan step(s) | {{"), 3, "a decision table to fill in for every module")
+        self.assertIn("| Fix chosen | {{no Snyk fix:", md, "no Snyk fix: left open")
+
+
+class ModulesIntoPlan(Sandbox):
+    """--into-plan: the script puts the itemized modules into 03-plan.md, so nobody re-types them (token budget)."""
+
+    def setUp(self):
+        super().setUp()
+        self.report = self.write("in/r.json", json.dumps({"projectName": "com.example:app", "vulnerabilities": [H2, NOFIX]}))
+        self.plan = self.write("plan.md", self.read("toolkit/templates/03-plan.md"))
+
+    def test_modules_replace_the_placeholder_section_and_leave_the_rest_alone(self):
+        before = self.read(self.plan)
+        self.script("parse-snyk.py", self.report, "--into-plan", self.plan, check=True)
+        after = self.read(self.plan)
+        self.assertIn("### 1. `com.h2database:h2@2.2.224`", after)
+        self.assertIn("### 2. `org.foo:bar@1.0`", after)
+        self.assertNotIn("{{group:artifact@version}}", after.split("## Path coverage")[0], "placeholder module replaced")
+        for keep in ("## Approval", "## Strategy", "## Steps", "## Path coverage", "## Rollback", "## Out of scope"):
+            self.assertIn(keep, after)
+        self.assertEqual(before.split("## Path coverage")[1], after.split("## Path coverage")[1], "the rest is untouched")
+
+    def test_running_it_again_keeps_every_filled_in_field_even_partly_decided_modules(self):
+        helpers = os.path.join(self.root, "toolkit", "scripts", "script-helpers.py")
+        self.script("parse-snyk.py", self.report, "--into-plan", self.plan, check=True)
+        decide = lambda *a: self.run_cmd([sys.executable, "-I", helpers, "plan-decide", self.plan] + list(a), check=True)
+        decide("1", "In scope?=yes", "Target version=2.3.232", "Plan step(s)=Step 1", "Compatibility / risk=low, patch line",
+               "Fix chosen=upgrade `com.h2database:h2` to 2.3.232")
+        decide("2", "Plan step(s)=Step 4")                     # module 2 only partly decided
+        proc = self.script("parse-snyk.py", self.report, "--into-plan", self.plan, check=True)
+        self.assertIn("filled-in decision fields kept", proc.stdout)
+        again = self.read(self.plan)
+        mod1, mod2 = again.split("### 2.")[0], again.split("### 2.")[1]
+        self.assertIn("| Fix chosen | upgrade `com.h2database:h2` to 2.3.232 |", mod1, "your decision wins over Snyk's")
+        self.assertIn("| Compatibility / risk | low, patch line |", mod1)
+        self.assertIn("| Plan step(s) | Step 4 |", mod2, "a partly decided module keeps what was decided")
+        self.assertIn("| In scope? | {{", mod2, "... and the rest stays open")
+
+    def test_a_plan_without_the_section_is_an_error(self):
+        self.write(self.plan, "# plan\n\n## Steps\n")
+        self.assertNotEqual(self.script("parse-snyk.py", self.report, "--into-plan", self.plan).returncode, 0)
+
+
+class EfficientPlanning(Sandbox):
+    """The plan step reads a one-line index and sets decisions in bulk; plan-check proves nothing was left open."""
+
+    def setUp(self):
+        super().setUp()
+        up = vuln("SNYK-UP-1", "org.example:up", "1.0", "high", [APP, "org.example:intro@1.0", "org.example:up@1.0"],
+                  [False, "org.example:intro@2.0"], ["1.1"], ["CVE-2026-0101"])
+        pin = vuln("SNYK-PIN-2", "org.example:pin", "3.0", "medium", [APP, "org.example:legacy@0.1", "org.example:pin@3.0"],
+                   [], ["3.1"], ["CVE-2026-0102"], upgradable=False)
+        self.write("wf/snyk/app.json", json.dumps({"projectName": "com.example:app", "vulnerabilities": [up, pin, NOFIX]}))
+        self.write("wf/snyk/findings.json", "{}")                               # our own output, must be ignored
+        self.plan = self.write("wf/03-plan.md", self.read("toolkit/templates/03-plan.md"))
+        self.helpers = os.path.join(self.root, "toolkit", "scripts", "script-helpers.py")
+
+    def helper(self, *args, **kw):
+        return self.run_cmd([sys.executable, "-I", self.helpers] + list(args), **kw)
+
+    def test_wildcards_are_expanded_by_the_script_itself_and_own_outputs_skipped(self):
+        proc = self.script("parse-snyk.py", os.path.join(self.root, "wf", "snyk", "*.json"),    # unexpanded, like PowerShell
+                           "--index", os.path.join(self.root, "wf", "index.md"), check=True)
+        self.assertIn("across 1 projects", proc.stdout)
+        self.assertNotIn("findings.json is not", proc.stdout, "our own findings.json is skipped quietly")
+
+    def test_index_is_one_terse_line_per_module(self):
+        self.script("parse-snyk.py", os.path.join(self.root, "wf", "snyk", "*.json"), "--index",
+                    os.path.join(self.root, "wf", "index.md"), check=True)
+        index = self.read("wf/index.md")
+        rows = [l for l in index.splitlines() if re.match(r"^\| \d+ \|", l)]
+        self.assertEqual(len(rows), 3)
+        self.assertIn("| `org.example:up@1.0` | high | fixable by upgrade | 1 | 1 | upgrade intro→2.0 |", index)
+        self.assertIn("override→3.1", index)
+        self.assertIn("no fix", index)
+
+    def test_snyk_decisions_are_prefilled_and_the_rest_left_open(self):
+        self.script("parse-snyk.py", os.path.join(self.root, "wf", "snyk", "*.json"), "--into-plan", self.plan, check=True)
+        plan = self.read(self.plan)
+        self.assertIn("| Fix chosen | upgrade `org.example:intro` 1.0 -> 2.0 _(Snyk's fix for every path)_ |", plan)
+        self.assertIn("| Verified by | Snyk re-scan shows SNYK-UP-1 gone · build and tests green |", plan)
+        self.assertIn("| Fix chosen | {{no Snyk fix:", plan, "no fix: left for a decision")
+        self.assertIn("| Target version | {{at least the fixed-in version for your line: 1.1}} |", plan)
+
+    def test_bulk_decisions_then_plan_check_proves_completeness(self):
+        self.script("parse-snyk.py", os.path.join(self.root, "wf", "snyk", "*.json"), "--into-plan", self.plan, check=True)
+        check = self.helper("plan-check", self.plan)
+        self.assertEqual(check.returncode, 1)
+        self.assertIn("3 of 3 modules still have open decisions", check.stdout)
+        self.helper("plan-decide", self.plan, "all", "In scope?=yes", "Compatibility / risk=see 03-impact.md | low", check=True)
+        self.helper("plan-decide", self.plan, "1-2", "Plan step(s)=Step 1", check=True)
+        self.helper("plan-decide", self.plan, "status:fixable by upgrade", "Target version=1.1", check=True)
+        self.helper("plan-decide", self.plan, "2", "Target version=3.1", check=True)
+        still = self.helper("plan-check", self.plan)
+        self.assertIn("1 of 3 modules still have open decisions", still.stdout)
+        self.assertIn("3. org.foo:bar@1.0: Fix chosen, Target version, Plan step(s)", still.stdout)
+        self.helper("plan-decide", self.plan, "3", "In scope?=no, see Out of scope #1", "Fix chosen=out of scope",
+                    "Target version=-", "Plan step(s)=-", check=True)
+        done = self.helper("plan-check", self.plan)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("all 3 modules decided", done.stdout)
+        self.assertIn("| Compatibility / risk | see 03-impact.md / low |", self.read(self.plan), "| in a value can't break the table")
+
+    def test_plan_decide_rejects_unknown_fields_and_empty_selections(self):
+        self.script("parse-snyk.py", os.path.join(self.root, "wf", "snyk", "*.json"), "--into-plan", self.plan, check=True)
+        self.assertNotEqual(self.helper("plan-decide", self.plan, "1", "Colour=blue").returncode, 0)
+        self.assertNotEqual(self.helper("plan-decide", self.plan, "status:does not exist", "In scope?=yes").returncode, 0)
 
 
 class SnykScanTests:

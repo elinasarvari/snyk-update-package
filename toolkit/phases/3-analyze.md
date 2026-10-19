@@ -38,11 +38,20 @@ Requires phase 2 ✅. Read-only. Writes `03-impact.md` and `03-plan.md`.
         the package, or whether it can be **excluded** (`<exclusions>`) because nothing in the repo uses it
         (`git grep` for its packages/classes);
      4. only when 1–3 are exhausted does the path go to **Out of scope**, saying what was tried.
-   - **Vulnerable modules, itemized:** copy `snyk/vulnerable-modules.md` into the plan's *Vulnerable modules* section
-     (regenerate it with `parse-snyk.py … --modules` if the scope changed) and **fill in the Decision table of every
-     module**: in scope or not, fix chosen, target version, plan step(s), compatibility/risk (cite 03-impact.md), how
-     it's verified. A module out of scope says so and points to its *Out of scope* row. Never drop a module or an
-     issue row: the list must match the scan.
+   - **Vulnerable modules, itemized (do it by script, not by hand):**
+     1. `python3 -I toolkit/scripts/parse-snyk.py "workflows/<id>/snyk/*.json" --into-plan workflows/<id>/03-plan.md`
+        puts every module into the plan: facts, issues, paths, and a Decision table where **Fix chosen** and
+        **Verified by** are already filled in from Snyk's data. A re-run keeps decisions you filled in.
+     2. Read `snyk/module-index.md` (one line per module), **not** the full entries. Open a module's full entry only
+        if its status is `needs an override`, `partly fixable` or `no fix`, or its fix isn't what the plan does.
+     3. Fill in the open fields **for groups of modules at once**:
+        `python3 -I toolkit/scripts/script-helpers.py plan-decide workflows/<id>/03-plan.md <which> "<Field>=<value>" ...`
+        where `<which>` is `all`, numbers/ranges (`1-12,15`) or `status:<status>`. Fields: `In scope?`, `Fix chosen`,
+        `Target version`, `Plan step(s)`, `Compatibility / risk`, `Verified by`. Example:
+        `plan-decide … 1-12 "Plan step(s)=Step 1" "Compatibility / risk=see 03-impact.md: Spring Boot 3.5"`.
+     4. **`python3 -I toolkit/scripts/script-helpers.py plan-check workflows/<id>/03-plan.md` must say "all N
+        modules decided"** before the plan goes to the user. It lists every module that still has a gap.
+     Out-of-scope modules: `In scope?=no, see Out of scope #n`, and a row in *Out of scope*.
    - **Path coverage table:** for each in-scope package, list each path and the plan step that fixes it, or "out of
      scope". A package counts as fixed only when all its paths are.
    - Give exact diffs for pom/config edits, and precise descriptions with `path:line` for code edits.

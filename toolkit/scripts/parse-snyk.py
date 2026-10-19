@@ -19,6 +19,9 @@ Usage:
 
 --modules writes the "Vulnerable modules" section for 03-plan.md: one itemized entry per vulnerable
 module (facts, every Snyk issue, every path) with the decision fields left for the plan to fill in.
+--index writes a one-line-per-module summary (what the plan step reads first).
+--into-plan <03-plan.md> puts that section straight into the plan (replacing its "## Vulnerable modules"
+section), so nobody has to copy it by hand. Decision tables already filled in are kept when it runs again.
 
 Accepts both shapes Snyk emits: a single project object, or a list (`--all-projects`).
 Written for Python 3.9 - no match statements or `X | None`.
@@ -27,6 +30,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
 from collections import OrderedDict
 
@@ -54,9 +58,22 @@ def add_unique(items, value):
         items.append(value)
 
 
+OWN_OUTPUTS = ("findings.json",)      # written by this script next to the reports; never a Snyk report
+
+
+def expand_paths(args):
+    """Expand *.json ourselves: PowerShell passes wildcards to programs unexpanded."""
+    import glob
+    out = []
+    for arg in args:
+        hits = sorted(glob.glob(arg)) if any(c in arg for c in "*?[") else [arg]
+        out += [h for h in hits if os.path.basename(h) not in OWN_OUTPUTS]
+    return out
+
+
 def load_projects(paths):
     projects = []
-    for path in paths:
+    for path in expand_paths(paths):
         try:
             with open(path, encoding="utf-8") as fh:
                 data = json.load(fh)
@@ -291,14 +308,86 @@ def to_modules(packages):
             out.append("| %d | %s | %s |" % (i, " › ".join("`%s`" % c for c in entry["path"]), entry["remediation"]))
         if len(p["paths"]) > MAX_PATHS_SHOWN:
             out.append("| | _… %d more paths in snyk/findings.json_ | |" % (len(p["paths"]) - MAX_PATHS_SHOWN))
+        fixes = sorted({e["remediation"] for e in p["paths"] if e["fix"] in ("upgrade", "override")})
+        no_fix = any(e["fix"] in ("none", "patch") for e in p["paths"])
+        if fixes and not no_fix:
+            fix_chosen = "; ".join(fixes) + " _(Snyk's fix for every path)_"
+        elif fixes:
+            fix_chosen = "; ".join(fixes) + " + {{the path(s) Snyk can't fix: newer introducing library / exclude / out of scope}}"
+        else:
+            fix_chosen = "{{no Snyk fix: newer introducing library / exclude / out of scope}}"
         out += ["", "**Decision**", "", "| | |", "|---|---|",
                 "| In scope? | {{yes / no: see Out of scope #n}} |",
-                "| Fix chosen | {{upgrade `<dependency>` / override / newer introducing library / exclude / out of scope}} |",
-                "| Target version | {{version the module ends up at}} |",
+                "| Fix chosen | %s |" % fix_chosen,
+                "| Target version | {{at least the fixed-in version for your line: %s}} |" % (", ".join(p["fixed_in"]) or "none known"),
                 "| Plan step(s) | {{Step n, …: every path above is covered}} |",
                 "| Compatibility / risk | {{what could break, with evidence from 03-impact.md}} |",
-                "| Verified by | {{Snyk re-scan shows the issues gone · tests · smoke boot}} |", ""]
+                "| Verified by | Snyk re-scan shows %s gone · build and tests green |" % ", ".join(d["id"] for d in p["issue_details"]),
+                ""]
     return "\n".join(out)
+
+
+def short_fix(text):
+    """'upgrade `g:a` 1 -> 2' -> 'upgrade a→2'; 'override `g:p` to 3 (…)' -> 'override→3'; else 'no fix' / 'patch'."""
+    m = re.match(r"upgrade `([^`]+)` \S+ -> (\S+)", text)
+    if m:
+        return "upgrade %s→%s" % (m.group(1).split(":")[-1], m.group(2))
+    m = re.match(r"override `[^`]+` to (\S+)", text)
+    if m:
+        return "override→%s" % m.group(1)
+    return "patch" if text.startswith("Snyk patch") else "no fix"
+
+
+def to_index(packages):
+    """One line per vulnerable module (~30 tokens each): what the plan step reads instead of every full entry."""
+    out = ["# Vulnerable modules: index", "",
+           "One line per module, same numbering as the plan's *Vulnerable modules*. Read a module's full entry only when",
+           "its status isn't `fixable by upgrade`.", "",
+           "| # | Module | Severity | Status | Issues | Paths | Snyk's fix |", "|---|--------|----------|--------|--------|-------|-----------|"]
+    for n, p in enumerate(packages, 1):
+        fixes = sorted({short_fix(e["remediation"]) for e in p["paths"]})
+        out.append("| %d | `%s@%s` | %s | %s | %d | %d | %s |" % (
+            n, p["package"], p["version"], p["max_severity"], p["status"], len(p["issue_details"]), len(p["paths"]),
+            "; ".join(fixes[:4]) + (" (+%d more)" % (len(fixes) - 4) if len(fixes) > 4 else "")))
+    return "\n".join(out) + "\n"
+
+
+DECISION_ROW = re.compile(r"^\| (In scope\?|Fix chosen|Target version|Plan step\(s\)|Compatibility / risk|Verified by) \|")
+
+
+def _module_decisions(section):
+    """{module heading: {field: row}} for every Decision field somebody filled in (no {{placeholder}} left).
+    Kept field by field, so partly decided modules don't lose what's already decided."""
+    kept, heading = {}, None
+    for line in section.splitlines():
+        if line.startswith("### "):
+            heading = re.sub(r"^### \d+\. ", "### ", line)
+        elif heading and DECISION_ROW.match(line) and "{{" not in line:
+            kept.setdefault(heading, {})[DECISION_ROW.match(line).group(1)] = line
+    return kept
+
+
+def into_plan(plan_path, modules_md):
+    with open(plan_path, encoding="utf-8") as fh:
+        plan = fh.read()
+    start = plan.find("## Vulnerable modules")
+    if start == -1:
+        sys.exit("%s has no '## Vulnerable modules' section" % plan_path)
+    nxt = re.search(r"^## ", plan[start + 3:], re.M)
+    end = start + 3 + nxt.start() if nxt else len(plan)
+    kept = _module_decisions(plan[start:end])
+    out, heading, carried = [], None, 0
+    for line in modules_md.splitlines():
+        if line.startswith("### "):
+            heading = re.sub(r"^### \d+\. ", "### ", line)
+        m = DECISION_ROW.match(line)
+        if m and heading in kept and m.group(1) in kept[heading]:
+            line = kept[heading][m.group(1)]                       # your decision wins over the regenerated row
+            carried += 1
+        out.append(line)
+    with open(plan_path, "w", encoding="utf-8") as fh:
+        fh.write(plan[:start] + "\n".join(out).rstrip("\n") + "\n\n" + plan[end:])
+    return carried
 
 
 def write_csv(path, packages):
@@ -320,6 +409,8 @@ def main():
     parser.add_argument("--json", dest="json_out")
     parser.add_argument("--csv", dest="csv_out")
     parser.add_argument("--modules", dest="modules_out")
+    parser.add_argument("--into-plan", dest="plan_path")
+    parser.add_argument("--index", dest="index_out")
     args = parser.parse_args()
 
     projects = load_projects(args.reports)
@@ -336,6 +427,13 @@ def main():
     if args.modules_out:
         with open(args.modules_out, "w", encoding="utf-8") as fh:
             fh.write(to_modules(packages))
+    if args.index_out:
+        with open(args.index_out, "w", encoding="utf-8") as fh:
+            fh.write(to_index(packages))
+    if args.plan_path:
+        kept = into_plan(args.plan_path, to_modules(packages))
+        print("put %d vulnerable modules into %s (%d filled-in decision fields kept)"
+              % (len(packages), args.plan_path, kept), file=sys.stderr)
     sys.stdout.write(markdown)
     print("\n%d flagged packages, %d direct changes, across %d projects."
           % (len(packages), len(changes), len(projects)), file=sys.stderr)

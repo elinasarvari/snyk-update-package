@@ -194,8 +194,9 @@ Decision   in scope? · fix chosen · target version · plan step(s) · compatib
 | **Compatibility / risk** | Says what could break, with evidence from `03-impact.md`, not just "low risk" |
 | **In scope? = no** | Points to a row in *Out of scope* that says why and what happens next |
 
-**4. Check nothing is missing.** The number of module entries should match the number of flagged packages in
-`01-snyk-findings.md`, and every Snyk issue there should appear in some module's Issues table.
+**4. Check nothing is missing.** The module entries are generated from the scan, so every flagged package and
+issue is there by construction, and `plan-check` has confirmed every module has a decision. For a quick overview, open
+`snyk/module-index.md`: one line per module, with its status and Snyk's fix.
 
 **5. Reply.**
 
@@ -207,15 +208,19 @@ Decision   in scope? · fix chosen · target version · plan step(s) · compatib
 module and issue, marked **✅ fixed**, **➖ out of scope** (as planned), or **⛔ still open, not planned**. A ⛔ means
 the plan missed something; the report proposes a fix.
 
-**Regenerating the list** (e.g. after changing the scope). The assistant does this itself, but by hand it's:
+**Regenerating the list** (e.g. after changing the scope). The assistant does this itself; by hand it's below.
+It refreshes the facts and **keeps every decision field already filled in**:
 
 ```bash
-python3 -I toolkit/scripts/parse-snyk.py workflows/wf-001-<repo>/snyk/<repo>.json --modules workflows/wf-001-<repo>/snyk/vulnerable-modules.md   # macOS
+python3 -I toolkit/scripts/parse-snyk.py "workflows/wf-001-<repo>/snyk/*.json" --into-plan workflows/wf-001-<repo>/03-plan.md   # macOS
 ```
 
 ```powershell
-py -3 -I toolkit\scripts\parse-snyk.py workflows\wf-001-<repo>\snyk\<repo>.json --modules workflows\wf-001-<repo>\snyk\vulnerable-modules.md   # Windows
+py -3 -I toolkit\scripts\parse-snyk.py "workflows\wf-001-<repo>\snyk\*.json" --into-plan workflows\wf-001-<repo>\03-plan.md   # Windows
 ```
+
+**Is every module decided?** `python3 -I toolkit/scripts/script-helpers.py plan-check workflows/wf-001-<repo>/03-plan.md`
+lists any module with an open field. `/dep-run` only asks you to approve once this says *"all N modules decided"*.
 
 ## Saving workflow results into the repository
 
@@ -671,7 +676,7 @@ workflows/wf-001-spring-boot-4-1/
 ├── 04-apply-log.md         what changed per step, deviations from the plan
 ├── 05-verification.md      build/test/boot results per repo, before vs after, verdict
 ├── 06-publish.md           commits and PR links
-├── snyk/                   raw Snyk JSON per repo, findings.{md,csv,json}, vulnerable-modules.md
+├── snyk/                   raw Snyk JSON per repo, findings.{md,csv,json}, vulnerable-modules.md, module-index.md
 ├── facts/<repo>/           resolved dependency tree, declared deps, version properties
 ├── analysis/<repo>--<artifact>.md   full report from each analyst subagent
 └── verification/{baseline,after}/<repo>/summary.json, diagnosis.md

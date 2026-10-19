@@ -26,30 +26,13 @@ library), never a target to assume.
 | 5 | `/dep-verify` | [phases/5-verify.md](phases/5-verify.md) | `repo-verifier` × repo | no (build output only) |
 | 6 | `/dep-publish` | [phases/6-publish.md](phases/6-publish.md) | — | **yes**: commit, push, open PR |
 | — | `/dep-run <repo>` | [RUN.md](RUN.md): **autopilot**, every step for one repo; stops at approval, blockers, and before publish | all three | only after the user approves (via step 4) |
-| — | `/dep-upgrade` | this file, "Orchestrating" | any of the above | — |
+| — | `/dep-upgrade` | [UPGRADE.md](UPGRADE.md) | any of the above | — |
 
-## Layout (paths relative to the project root)
+## Where things are
 
-| Path | What |
-|------|------|
-| `repos/repos.txt` | Target repos, by git URL: `<name> <git-url> [branch=] [path=] [smoke=true] [build="..."]` |
-| `repos/<name>/` (`repo_dir`) | The repo's clone (git-ignored). **All code changes happen here**, on the workflow's branch `deps/<id>`. Build dir = `<repo_dir>/<path>`. The user's own checkouts elsewhere are never touched |
-| `workflows/wf-<NNN>-<slug>/` | One folder per upgrade: `STATUS.md` + the numbered docs + raw data |
-| `workflows/<id>/repos.txt` | Optional: limit this upgrade to some repos (same format) |
-| `toolkit/phases/`, `roles/`, `templates/`, `scripts/` | Procedures, subagent definitions, doc templates, tools |
-
-Scripts (run from the project root, Python with `python3 -I`):
-
-| Script | Purpose |
-|--------|---------|
-| `toolkit/scripts/repos.py add\|ensure\|clone\|list\|status\|release` | Manage target repos. `--workflow <id> clone` puts each clone on `deps/<id>`. `list` gives `name, build_dir, verify_args, url, base_branch, repo_dir` as TSV |
-| `toolkit/scripts/snyk-scan.sh <out> [--manifest f] [snyk args]` | `snyk test --all-projects --json` for every repo folder |
-| `toolkit/scripts/parse-snyk.py <json…> --md --csv --json` | Every flagged package + changes grouped by the dependency you edit |
-| `toolkit/scripts/maven-facts.sh <build_dir> <out> [filters]` | Parent, declared deps, version properties, resolved tree |
-| `toolkit/scripts/verify-repo.sh <build_dir> <out> [--smoke] [--build-cmd]` | Build → JUnit counts → smoke boot → `summary.json` |
-
-The manifest for an upgrade is `workflows/<id>/repos.txt` if it exists, else `repos/repos.txt`. Pass it with
-`--manifest` to `repos.py` and `snyk-scan.sh`.
+Target repos: `repos/repos.txt` → clones in `repos/<name>/`. Each run: `workflows/wf-NNN-<slug>/`. Procedures:
+`toolkit/phases/`, `toolkit/roles/`, `toolkit/RUN.md`, `toolkit/UPGRADE.md`. Every script, its arguments and the folder
+layout: `toolkit/REFERENCE.md` (read it only when a phase file doesn't already give the exact command).
 
 ## Token budget (read this, it saves a lot)
 
@@ -63,6 +46,10 @@ Every file you open and every line you print costs context. Keep it small:
 | reading files to find code | `git -C <repo> grep -n -l <pattern>` for the file list, then read only the lines around each hit |
 | re-researching a version jump | the research cache `workflows/_research/` (see `roles/dependency-analyst.md`) |
 | all phase files up front | only the phase file you're running now |
+| re-typing generated tables into a document | link them, or let a script insert them (`parse-snyk.py --into-plan`) |
+| reading `snyk/findings.md` in full | section 2 ("changes to make") for planning; `grep` for a package |
+| reading every module of a long `vulnerable-modules.md` / plan | `snyk/module-index.md` (one line per module); a full entry only for exceptions |
+| editing each module's Decision table one by one | `script-helpers.py plan-decide <plan> <which> "Field=value"` for groups, then `plan-check` |
 
 - **Replies stay short:** what was produced (links), the headline findings (a few bullets), the next step. Never paste
   file contents, logs or long tables into the chat: link the file.
@@ -88,24 +75,6 @@ The procedures show macOS/Linux commands. **On Windows, translate every command 
   PowerShell 5.1 and PowerShell 7. The shared parsing is in `toolkit/scripts/script-helpers.py`.
 - Builds use `mvnw.cmd` / `gradlew.bat` on Windows. The Snyk CLI is `snyk-win.exe` (or `snyk` from npm).
 - Paths may use `\` or `/`. The scripts print project paths with `/` on every OS.
-
-## Orchestrating (`/dep-upgrade`)
-
-1. **Which upgrade?**
-   - `status` or an existing workflow id → resume it.
-   - a git URL, or a local checkout (used only to find its URL) → run phase 0 to add it, then continue as a new upgrade.
-   - a Snyk JSON path, pasted Snyk output, or "scan" → new upgrade starting at phase 1.
-   - `group:artifact X->Y` pairs → new upgrade starting at phase 2 (phase 1 = "skipped — manual").
-   - no argument → show `workflows.py list` and `repos.py status`, then ask which.
-2. **New workflow:** `python3 -I toolkit/scripts/workflows.py new <slug> --title "<title>" --source "<source>"`. It allocates the next
-   unique id (`wf-001`, `wf-002`, ... never reused) and creates `workflows/<id>-<slug>/STATUS.md`. Make sure
-   phase 0 is done (every repo folder in the manifest exists) before phases 1–5.
-3. **Resume:** read `STATUS.md`, run the first phase not ✅. **Gates:** phase 4 needs `03-plan.md`
-   to contain `- [x] Approved by user`, ticked only after the user approves in chat. Phases 4 and
-   6 run only when the user asks for them explicitly.
-4. **One phase per run** by default; continue only if the user asks, and never past a gate.
-5. **End every run** by updating STATUS (state, date, ▶ Next step) and replying with what was
-   produced (links), the headline findings, and **▶ Next step**: one concrete command or decision.
 
 ## Tracking every run (unique ids, steps, history)
 

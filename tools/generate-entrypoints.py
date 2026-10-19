@@ -22,7 +22,7 @@ PHASES = [
      [("Approve the plan and continue", "dep-run", "I have reviewed 03-plan.md for this workflow and approve it as written. Continue: apply and verify."),
       ("Publish the PRs", "dep-publish", "Verification is green. Commit, push and open PRs for this workflow."),
       ("Where does it stand?", "dep-upgrade", "status")]),
-    ("dep-upgrade", None,
+    ("dep-upgrade", "toolkit/UPGRADE.md",
      "Show where every workflow stands (status), or run ONE next step of a workflow across the repos in repos/repos.txt, and always state the next step. For hands-off runs on one repo use /dep-run. Offers apply/publish as handoffs only.",
      "[status | workflow id (1, wf-001) | folder or git-url | snyk.json | group:artifact current->target]",
      ["dependency-analyst", "repo-verifier"], False,

@@ -14,10 +14,10 @@
 
 ## 1. Every flagged package
 
-One row per `package@version`. "Introduced via" = the direct dependency that pulls it in.
-
-| # | Package | Current | Severity | Issues | CVEs | Fixed in | Introduced via | Remediation | Projects |
-|---|---------|---------|----------|--------|------|----------|----------------|-------------|----------|
+Full table (one row per `package@version`: severity, status, issues, CVEs, fixed in, introduced via, remediation):
+**[snyk/findings.md](snyk/findings.md)**, section 1. Spreadsheet: [snyk/findings.csv](snyk/findings.csv). Itemized per
+module, with every issue and path: [snyk/vulnerable-modules.md](snyk/vulnerable-modules.md). *Linked, not copied:
+these are generated and can be long.*
 
 ## 2. Changes to make — triaged
 
@@ -27,14 +27,14 @@ One row per `package@version`. "Introduced via" = the direct dependency that pul
 Fix: `upgrade` · `override` (no upgrade path: force the vulnerable package to its fixed version) · `none`.
 Bucket: `platform` (moves with a parent/BOM; name it in "Real lever") · `direct` · `override` · `no-fix / license`.
 
-## 3. Detailed paths
+## 3. Modules an obvious upgrade won't fix
 
-Every path each package arrives by, and the fix for that path (from `snyk/findings.md`, section 3). List here the
-packages whose status is **needs an override**, **partly fixable** or **no fix**, with their paths. These are the
-ones an obvious upgrade misses.
+Only the names: their paths and per-path fixes are in [snyk/findings.md](snyk/findings.md), section 3.
 
-| Package | Path | Fix for this path |
-|---------|------|-------------------|
+| Package | Status | Why |
+|---------|--------|-----|
+
+Status: `needs an override` · `partly fixable` · `no fix`.
 
 ## Scope decision
 

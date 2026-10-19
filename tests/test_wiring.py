@@ -273,16 +273,37 @@ class RemediationAndScope(unittest.TestCase):
     def test_plan_itemizes_every_vulnerable_module(self):
         self.assertIn("--modules workflows/<id>/snyk/vulnerable-modules.md", read("toolkit/phases/1-scan.md"))
         self.assertIn("Vulnerable modules, itemized", read("toolkit/phases/3-analyze.md"))
+        self.assertIn("--into-plan", read("toolkit/phases/3-analyze.md"))
+        for must in ("module-index.md", "plan-decide", "plan-check", "all N\n        modules decided"):
+            self.assertIn(must, read("toolkit/phases/3-analyze.md"))
+        self.assertIn("only once `plan-check` says every module is decided", read("toolkit/RUN.md"))
         self.assertIn("## Vulnerable modules", read("toolkit/templates/03-plan.md"))
         self.assertIn("## Vulnerable modules: before → after", read("toolkit/templates/05-verification.md"))
 
-    def test_findings_show_fix_types_and_detailed_paths(self):
-        self.assertIn("## 3. Detailed paths", read("toolkit/templates/01-snyk-findings.md"))
-        self.assertIn("**detailed\n   paths**", read("toolkit/phases/1-scan.md"))
+    def test_findings_link_the_generated_tables_instead_of_copying_them(self):
+        tpl = read("toolkit/templates/01-snyk-findings.md")
+        self.assertIn("[snyk/findings.md](snyk/findings.md)", tpl)
+        self.assertIn("[snyk/vulnerable-modules.md](snyk/vulnerable-modules.md)", tpl)
+        self.assertIn("## 3. Modules an obvious upgrade won't fix", tpl)
+        self.assertNotIn("| # | Package | Current | Severity | Issues |", tpl, "the big table is linked, not re-typed")
+        self.assertIn("**link** the generated tables, don't copy", read("toolkit/phases/1-scan.md"))
 
     def test_leftover_findings_are_checked_and_reported(self):
         self.assertIn("must be in `03-plan.md` → Out of scope", read("toolkit/phases/5-verify.md"))
         self.assertIn("Known remaining issues", read("toolkit/phases/6-publish.md"))
+
+
+class LeanOverview(unittest.TestCase):
+    """WORKFLOW.md is read before every command, so rarely needed parts live in their own files."""
+
+    def test_rarely_needed_sections_moved_out(self):
+        overview = read("toolkit/WORKFLOW.md")
+        self.assertNotIn("## Orchestrating", overview)
+        self.assertNotIn("## Layout", overview)
+        self.assertIn("## Steps", read("toolkit/UPGRADE.md"))
+        self.assertIn("## Layout", read("toolkit/REFERENCE.md"))
+        self.assertIn("toolkit/UPGRADE.md", read(".claude/skills/dep-upgrade/SKILL.md"))
+        self.assertLess(len(overview), 11000, "keep the always-read overview under ~2.75k tokens")
 
 
 class TokenBudget(unittest.TestCase):
@@ -291,7 +312,8 @@ class TokenBudget(unittest.TestCase):
     def test_budget_rules_steer_away_from_large_files(self):
         text = read("toolkit/WORKFLOW.md")
         self.assertIn("## Token budget", text)
-        for must in ("snyk/*.json", "first-errors", "filtered-tree.txt", "git -C <repo> grep -n -l", "workflows/_research/"):
+        for must in ("snyk/*.json", "first-errors", "filtered-tree.txt", "git -C <repo> grep -n -l", "workflows/_research/",
+                     "--into-plan", "snyk/module-index.md", "plan-decide"):
             self.assertIn(must, text)
 
     def test_research_is_cached_and_reused(self):

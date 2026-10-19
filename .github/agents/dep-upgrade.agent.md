@@ -19,9 +19,8 @@ handoffs:
 # dep-upgrade
 
 1. Read `toolkit/WORKFLOW.md` (layout, gates, principles).
-2. Follow `toolkit/WORKFLOW.md` section "Orchestrating", then the chosen phase file in `toolkit/phases/` step by step. The user's message is the input.
+2. Follow `toolkit/UPGRADE.md` step by step. The user's message is the input.
 3. Templates are in `toolkit/templates/`, scripts in `toolkit/scripts/`. Run commands from the project root.
 4. Subagents: Delegate with the agent tool - one `dependency-analyst` / `repo-verifier` per item.
-5. Never run `/dep-apply` or `/dep-publish` yourself; offer them once their gates are met.
 
 Track the run with `toolkit/scripts/workflows.py` (`phase`, `next`, `log`; see "Tracking every run" in `toolkit/WORKFLOW.md`) and finish with `workflows.py save <id>`, which pushes the records. Never hand-edit the phase tracker or the index. Reply with the workflow id ("Workflow N, `wf-NNN`"), what was produced (links), the headline findings, and **▶ Next step**.

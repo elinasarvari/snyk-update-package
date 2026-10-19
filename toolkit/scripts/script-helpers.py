@@ -22,6 +22,10 @@ identically and only differ in how they run processes. Python 3.9, stdlib only, 
     script-helpers.py ignore-dirs [--comma]            -> the folders never searched/scanned (toolkit/ignore-dirs.txt)
     script-helpers.py find-poms                        -> ./paths of every pom.xml in the current folder, skipping
                                                           the ignored folders, sorted
+    script-helpers.py plan-decide <plan> <which> "<Field>=<value>" ...
+                                                       -> set a Decision field for many modules at once. <which>:
+                                                          numbers / ranges (1,3,5-9), all, or status:<status>
+    script-helpers.py plan-check <plan>                -> list modules whose Decision still has {{gaps}}; exit 1 if any
 """
 import glob
 import json
@@ -198,6 +202,78 @@ def filter_tree(tree, out, words):
                 dst.write(line)
 
 
+DECISION_FIELDS = ("In scope?", "Fix chosen", "Target version", "Plan step(s)", "Compatibility / risk", "Verified by")
+
+
+def _plan_modules(lines):
+    """[(number, heading line index, end index, status)] for each '### n. `module`' in ## Vulnerable modules."""
+    try:
+        start = next(i for i, l in enumerate(lines) if l.startswith("## Vulnerable modules"))
+    except StopIteration:
+        sys.exit("the plan has no '## Vulnerable modules' section (run parse-snyk.py ... --into-plan first)")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    heads = [i for i in range(start, end) if re.match(r"^### \d+\. ", lines[i])]
+    mods = []
+    for k, h in enumerate(heads):
+        stop = heads[k + 1] if k + 1 < len(heads) else end
+        status = next((l.split("|")[2].strip() for l in lines[h:stop] if l.startswith("| Status (from Snyk) |")), "")
+        mods.append((int(re.match(r"^### (\d+)\.", lines[h]).group(1)), h, stop, status))
+    return mods
+
+
+def _select(mods, which):
+    if which == "all":
+        return mods
+    if which.startswith("status:"):
+        wanted = which[len("status:"):].strip()
+        return [m for m in mods if m[3] == wanted]
+    numbers = set()
+    for part in which.split(","):
+        a, _, b = part.strip().partition("-")
+        numbers.update(range(int(a), int(b or a) + 1))
+    return [m for m in mods if m[0] in numbers]
+
+
+def plan_decide(plan, which, assignments):
+    with open(plan, encoding="utf-8") as fh:
+        lines = fh.read().split("\n")
+    pairs = []
+    for a in assignments:
+        field, sep, value = a.partition("=")
+        if not sep or field.strip() not in DECISION_FIELDS:
+            sys.exit("'%s': use <Field>=<value> with Field one of: %s" % (a, ", ".join(DECISION_FIELDS)))
+        pairs.append((field.strip(), value.strip().replace("|", "/")))
+    chosen = _select(_plan_modules(lines), which)
+    if not chosen:
+        sys.exit("no module matches %r" % which)
+    for _, h, stop, _ in chosen:
+        for field, value in pairs:
+            row = next((i for i in range(h, stop) if lines[i].startswith("| %s |" % field)), None)
+            if row is None:
+                sys.exit("module at line %d has no '%s' row" % (h + 1, field))
+            lines[row] = "| %s | %s |" % (field, value)
+    with open(plan, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+    print("set %s for %d module(s): %s" % (", ".join(f for f, _ in pairs), len(chosen), ", ".join(str(m[0]) for m in chosen)))
+
+
+def plan_check(plan):
+    with open(plan, encoding="utf-8") as fh:
+        lines = fh.read().split("\n")
+    mods = _plan_modules(lines)
+    gaps = []
+    for n, h, stop, _ in mods:
+        open_fields = [l.split("|")[1].strip() for l in lines[h:stop]
+                       if l.startswith("| ") and l.split("|")[1].strip() in DECISION_FIELDS and "{{" in l]
+        if open_fields:
+            gaps.append("%d. %s: %s" % (n, lines[h].split("`")[1] if "`" in lines[h] else "", ", ".join(open_fields)))
+    if gaps:
+        print("%d of %d modules still have open decisions:" % (len(gaps), len(mods)))
+        print("\n".join("  " + g for g in gaps))
+        sys.exit(1)
+    print("all %d modules decided" % len(mods))
+
+
 def main(argv):
     if not argv:
         sys.exit(__doc__)
@@ -209,6 +285,7 @@ def main(argv):
         "env-info": env_info, "summary": lambda: summary(args[0], args[1:]),
         "first-errors": lambda: first_errors(*args[:2]), "filter-tree": lambda: filter_tree(args[0], args[1], args[2:]),
         "ignore-dirs": lambda: ignore_dirs("--comma" in args), "find-poms": find_poms,
+        "plan-decide": lambda: plan_decide(args[0], args[1], args[2:]), "plan-check": lambda: plan_check(args[0]),
     }
     if cmd not in table:
         sys.exit("unknown helper %r\n%s" % (cmd, __doc__))
