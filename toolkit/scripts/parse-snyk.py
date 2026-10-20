@@ -11,7 +11,9 @@ Produces three views:
                               for that path. A package is only fixed when EVERY path is.
 
 Remediation comes from each finding (upgradePath, isUpgradable, isPatchable, fixedIn) and, when the
-report has it, the project-level `remediation` section (upgrade / pin / patch / unresolved).
+report has it, the project-level `remediation` section (upgrade / pin / patch / unresolved). When a finding has no
+upgradePath of its own, the remediation section's upgrade for that path's direct dependency is used (if it lists the
+issue), then its pin, then the fixed-in override.
 
 Usage:
     python3 -I parse-snyk.py <report.json> [more.json ...]
@@ -114,8 +116,16 @@ MAX_PATHS_SHOWN = 20          # per package in the markdown (all of them are in 
 
 
 def project_remediation(project):
-    """Snyk's optional project-level remediation: {package name: pin target}, set of unresolved issue ids."""
+    """Snyk's optional project-level remediation section -> (pins, upgrades, unresolved):
+    pins {package name: pin version}; upgrades {direct dependency name: [(Snyk's version, issue ids it fixes)]};
+    unresolved: set of issue ids Snyk can't fix."""
     rem = project.get("remediation") or {}
+    upgrades = {}
+    for coord, info in (rem.get("upgrade") or {}).items():
+        name, _ = split_coord(coord)
+        _, target = split_coord((info or {}).get("upgradeTo"))
+        if name and target:
+            upgrades.setdefault(name, []).append((target, set((info or {}).get("vulns") or [])))
     pins = {}
     for coord, info in (rem.get("pin") or {}).items():
         name, _ = split_coord(coord)
@@ -123,25 +133,36 @@ def project_remediation(project):
         if name and target:
             pins[name] = target
     unresolved = {u.get("id") for u in (rem.get("unresolved") or []) if isinstance(u, dict)}
-    return pins, unresolved
+    return pins, upgrades, unresolved
 
 
-def path_fix(vuln, path, pins, unresolved):
-    """-> (fix type, text) for ONE dependency path of one finding."""
+def remediation_upgrade(upgrades, direct_name, vuln_id):
+    """Snyk's remediation-section version for this path's direct dependency, if it lists this issue. Several -> the
+    highest of Snyk's (so every issue is fixed)."""
+    versions = [t for t, ids in upgrades.get(direct_name, []) if vuln_id in ids]
+    return highest(versions)
+
+
+def path_fix(vuln, path, pins, upgrades, unresolved):
+    """-> (fix type, text, version to upgrade the direct dependency to) for ONE dependency path of one finding.
+    Order: the finding's upgradePath → the remediation section's upgrade → its pin → the fixed-in override."""
     upgrade = vuln.get("upgradePath") or []
     direct_name, direct_version = split_coord(path[1] if len(path) > 1 else None)
     pkg = vuln.get("packageName")
     _, target = split_coord(upgrade[1] if len(upgrade) > 1 else None)
     if vuln.get("isUpgradable") and target and direct_name:
-        return "upgrade", "upgrade `%s` %s -> %s" % (direct_name, direct_version, target)
+        return "upgrade", "upgrade `%s` %s -> %s" % (direct_name, direct_version, target), target
+    remediated = remediation_upgrade(upgrades, direct_name, vuln.get("id")) if direct_name else None
+    if remediated:
+        return "upgrade", "upgrade `%s` %s -> %s (Snyk remediation)" % (direct_name, direct_version, remediated), remediated
     if pkg in pins:
-        return "override", "override `%s` to %s (Snyk pin; no upgrade path)" % (pkg, pins[pkg])
+        return "override", "override `%s` to %s (Snyk pin; no upgrade path)" % (pkg, pins[pkg]), None
     fixed = fixed_for(vuln.get("fixedIn"), vuln.get("version"))
     if fixed:
-        return "override", "override `%s` to %s (no upgrade path: dependencyManagement / constraints)" % (pkg, fixed)
+        return "override", "override `%s` to %s (no upgrade path: dependencyManagement / constraints)" % (pkg, fixed), None
     if vuln.get("isPatchable"):
-        return "patch", "Snyk patch only"
-    return "none", "no remediation path" + (" (Snyk: unresolved)" if vuln.get("id") in unresolved else "")
+        return "patch", "Snyk patch only", None
+    return "none", "no remediation path" + (" (Snyk: unresolved)" if vuln.get("id") in unresolved else ""), None
 
 
 def snyk_edit(fix_type, remedy):
@@ -175,7 +196,7 @@ def collect(projects):
         name = project.get("projectName") or project.get("path") or "unknown"
         target_file = project.get("displayTargetFile") or ""
         location = "%s (%s)" % (name, target_file) if target_file else name
-        pins, unresolved = project_remediation(project)
+        pins, upgrades, unresolved = project_remediation(project)
 
         for vuln in project.get("vulnerabilities", []):
             path = vuln.get("from") or []
@@ -191,7 +212,9 @@ def collect(projects):
             _, target_version = split_coord(upgrade[1] if len(upgrade) > 1 else None)
             is_direct = direct_name == pkg_name
 
-            fix_type, remedy = path_fix(vuln, path, pins, unresolved)
+            fix_type, remedy, fix_target = path_fix(vuln, path, pins, upgrades, unresolved)
+            if fix_type == "upgrade":
+                target_version = fix_target           # upgradePath, or the remediation section's upgrade
 
             # Same issue appears once per dependency path; count each issue once per project.
             issue_key = (location, vuln.get("id"), pkg_name, pkg_version)

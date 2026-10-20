@@ -338,7 +338,7 @@ Decision   in scope? · fix chosen · target version · plan step(s) · compatib
 
 | Look at | It's right when |
 |---------|-----------------|
-| **Fix chosen** | Follows the order: upgrade the library that brings it in → **override** the module to the fixed version → a newer introducing library or excluding the module → only then *out of scope* |
+| **Fix chosen** | Follows the order: upgrade the library that brings it in (Snyk's upgrade path, or its *remediation* section when the finding has none: marked `(Snyk remediation)`) → **override** the module to the fixed version → a newer introducing library or excluding the module → only then *out of scope* |
 | **Target version** | **Snyk's version, exactly**, pre-filled from the scan. Any other version must be listed under *Strategy* → *Versions not from Snyk*, with its reason |
 | **Plan step(s)** | Names the steps that cover **every** path listed. Cross-check with the plan's *Path coverage* table |
 | **Compatibility / risk** | Says what could break, with evidence from `03-impact.md`, not just "low risk" |

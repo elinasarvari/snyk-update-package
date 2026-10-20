@@ -32,7 +32,8 @@ Requires phase 2 ✅. Read-only. Writes `03-impact.md` and `03-plan.md`.
    - **Order** the steps per repo so each compiles: pom/BOM bumps → coupled deps → renamed starters/artifacts
      → code package moves → config keys → test changes.
    - **Remediation order, for every in-scope package and each of its detailed paths** (`01-snyk-findings.md` §3):
-     1. **upgrade** the dependency that brings it in, or the parent/BOM that sets that dependency's version;
+     1. **upgrade** the dependency that brings it in, or the parent/BOM that sets that dependency's version, to Snyk's
+        version (the finding's upgrade path, or the report's *remediation* section when the finding has none);
      2. no upgrade path but a fixed version exists → **override** the vulnerable package to it (`<dependencyManagement>`
         in Maven, `constraints` in Gradle), after checking the introducing library works with that version
         (its release notes, or that its tests still pass at verify);

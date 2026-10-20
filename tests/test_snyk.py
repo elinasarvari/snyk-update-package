@@ -162,6 +162,27 @@ class RemediationAndPaths(Sandbox):
         self.assertEqual(path["fix"], "override")
         self.assertIn("to 2.2 (Snyk pin", path["remediation"])
 
+    def test_no_upgrade_path_uses_the_remediation_sections_upgrade_for_that_paths_dependency(self):
+        # The finding says "no fix", but Snyk's remediation section upgrades its direct dependency to 3.2.5 (and lists
+        # the issue): that path is an upgrade to Snyk's version, not an override or "none". Entries for another
+        # dependency, or that don't list this issue, don't count.
+        data, md = self.parse(self.report(
+            [self.snakeyaml(["org.springframework.boot:spring-boot-starter@3.0.0"], fixed=()),
+             self.snakeyaml(["com.acme:other@1.0"], fixed=())],
+            remediation={"upgrade": {
+                "org.springframework.boot:spring-boot-starter@3.0.0": {
+                    "upgradeTo": "org.springframework.boot:spring-boot-starter@3.2.5", "upgrades": ["org.yaml:snakeyaml@1.33"],
+                    "vulns": ["SNYK-YAML-1"]},
+                "com.acme:unrelated@1.0": {"upgradeTo": "com.acme:unrelated@9.0", "vulns": ["SNYK-YAML-1"]},
+                "com.acme:other@1.0": {"upgradeTo": "com.acme:other@2.0", "vulns": ["SNYK-OTHER-9"]}}}))
+        fixes = {p["path"][0]: (p["fix"], p["remediation"]) for p in data["packages"][0]["paths"]}
+        self.assertEqual(fixes["org.springframework.boot:spring-boot-starter@3.0.0"],
+                         ("upgrade", "upgrade `org.springframework.boot:spring-boot-starter` 3.0.0 -> 3.2.5 (Snyk remediation)"))
+        self.assertEqual(fixes["com.acme:other@1.0"][0], "none", "only an upgrade that lists THIS issue counts")
+        kinds = {(c["fix"], c["direct_dependency"], c["target_version"]) for c in data["changes"]}
+        self.assertIn(("upgrade", "org.springframework.boot:spring-boot-starter", "3.2.5"), kinds)
+        self.assertEqual(data["packages"][0]["status"], "partly fixable")
+
     def test_a_path_without_any_remediation_makes_the_package_partly_fixable(self):
         unfixable = vuln("SNYK-YAML-1", "org.yaml:snakeyaml", "1.33", "high",
                          [APP, "com.acme:old-thing@0.9", "org.yaml:snakeyaml@1.33"], [], [], upgradable=False)

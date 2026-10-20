@@ -11,7 +11,8 @@ Jackson etc. in these files are only **examples** of the patterns to look for (a
 library), never a target to assume.
 
 **Target versions are Snyk's, exactly.** Every version the plan moves to is the one Snyk names: the upgrade path's
-version for the dependency to edit, Snyk's pin, or for an override the lowest *fixed in* version above the current
+version for the dependency to edit (the finding's own, or else the report's *remediation* section's upgrade), Snyk's
+pin, or for an override the lowest *fixed in* version above the current
 one. When Snyk names several versions for the same dependency (one per issue or path), use the highest **of those**,
 so every issue is fixed. Never look up or choose the latest/newest release yourself. A version Snyk didn't name
 (a coupled library needs it, or Snyk has no fix for a path) is allowed only as the **lowest** version that works, with

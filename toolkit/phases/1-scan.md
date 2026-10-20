@@ -40,6 +40,9 @@ upgraded in isolation. Read-only.
    - **upgrade, platform:** the dependency is managed by a parent/BOM already in the pom. Many rows collapse into
      **one** lever bump; name the lever.
    - **upgrade, direct:** a version declared in the pom; bump it.
+   - **upgrade (Snyk remediation):** the finding itself has no upgrade path, but the report's `remediation` section
+     names an upgrade of that path's direct dependency that fixes it. The script uses that version, marked
+     `(Snyk remediation)`; treat it like any other upgrade.
    - **override:** Snyk has no upgrade path, but a fixed version exists (or Snyk suggests a pin). The vulnerable package
      itself gets forced to that version (`<dependencyManagement>` / Gradle constraints). Compatibility is checked in step 3.
    - **none:** no remediation on that path. It's examined in step 3 (the lowest newer introducing library that drops it, exclusion) before
