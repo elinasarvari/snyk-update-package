@@ -10,6 +10,7 @@ below.
 - [4. Where every file lives](#4-where-every-file-lives)
 - [5. What each step reads and writes](#5-what-each-step-reads-and-writes)
 - [6. Monorepos: one git repo, several projects](#6-monorepos-one-git-repo-several-projects)
+- [7. `/dep-run` across chats: stops, replies, resume](#7-dep-run-across-chats-stops-replies-resume)
 
 ---
 
@@ -65,13 +66,16 @@ stateDiagram-v2
     Blocked: Stopped · needs a decision
 
     Clone --> Scan
+    Clone --> Blocked: clone failed, no main branch, BLOCKED by another workflow
     Scan --> Login: CLI not logged in
     Login --> Scan: signed in, retry
     Scan --> Inventory: findings with a fix
     Scan --> [*]: no findings
+    Scan --> Blocked: no Snyk CLI or login not finished, and no Snyk JSON given
     Inventory --> Analyze
     Inventory --> Blocked: version mismatch, red baseline, missing target
-    Blocked --> Inventory: your decision
+    note right of Blocked: you fix it or decide, then /dep-run resumes the step that stopped
+    Apply --> Blocked: a step still red after two fix rounds
     Analyze --> Approve
     Approve --> Apply: you reply approve
     Approve --> Analyze: you ask for changes
@@ -285,3 +289,46 @@ flowchart TB
 | 3 Impact + plan | The whole repo's code, config and tests | the procedure (`git grep`), `parse-snyk.py --into-plan` |
 | 5 Verify | One build of the whole reactor; test results from every module, `node_modules/` ignored | `verify-repo.sh` / `.ps1` → `script-helpers.py junit`; tested in both shells |
 | Smoke boot | Not for monorepos: it looks for the app's jar in the root `target/` only | leave out `smoke=true` |
+
+---
+
+## 7. `/dep-run` across chats: stops, replies, resume
+
+A run is spread over several `/dep-run` calls: one per stop, ideally each in a fresh chat. It never relies on the
+chat. Every call finds the open run, reads `STATUS.md`, applies your reply and carries on from the first step that
+isn't done. Step by step for users:
+[README: What `/dep-run` does, step by step](../README.md#what-dep-run-does-step-by-step).
+
+```mermaid
+flowchart TB
+    go(["you run: /dep-run repo, plus your reply"])
+    go --> ensure["repos.py ensure<br/>name, URL or checkout → the repo's line"]
+    ensure --> open{"open run for this repo?<br/>workflows.py find-open"}
+    open -- yes --> resume["resume Workflow N<br/>workflows.py show → first step not done"]
+    open -- no --> new["new Workflow N (wf-NNN)<br/>workflows.py new · STATUS.md"]
+    resume --> reply["apply your reply first<br/>approve → tick 03-plan · scope → 01-findings<br/>decision → STATUS · logged in History"]
+    new --> steps
+    reply --> steps["run the steps in order<br/>0 Clone → 1 Scan → 2 Inventory → 3 Plan → 4 Apply → 5 Verify"]
+    steps --> stop{"stop point?"}
+    stop -- "plan ready (always)" --> s1["⏸ review 03-plan.md<br/>reply approve / changes"]
+    stop -- "verify done (always)" --> s2["⏸ green: /dep-publish wf-NNN<br/>red: reply approve fixes"]
+    stop -- "blocked" --> s3["⏸ what's needed: CLI, login, decision,<br/>a fixed baseline, another workflow published"]
+    stop -- "no findings" --> done(["run closed: nothing to do"])
+    s1 & s2 & s3 --> next["workflows.py next → STATUS.md + INDEX.md<br/>workflows.py save → commit + push records"]
+    next --> saved{"repo private?"}
+    saved -- yes --> pushed[("records on GitHub")]
+    saved -- "no (public)" --> refused["save refused, the reply says so<br/>records stay local until /dep-save"]
+    pushed & refused --> reply2["reply: Done this run · Stopped because · ▶ Next step"]
+    reply2 -. "you act, then (fresh chat)" .-> go
+    s2 -. "green" .-> publish(["you run: /dep-publish wf-NNN<br/>commit, push, PR"])
+
+    classDef you fill:#fde2e1,stroke:#c0392b,color:#7b241c
+    class s1,s2,s3,publish you
+```
+
+| Call | It does | Ends at |
+|------|---------|---------|
+| `/dep-run inventory-service` (first) | New Workflow N; steps 0 → 3 | ⏸ plan ready (or an earlier block) |
+| `/dep-run inventory-service approve` | Resumes, ticks the plan; steps 4 → 5 | ⏸ verification done |
+| `/dep-run inventory-service approve fixes` (only if red) | Adds the fixes as plan steps; 4 → 5 again | ⏸ verification done |
+| `/dep-publish wf-NNN` (green) | Commit, push the branch, open the PR | PR opened · run finished |
