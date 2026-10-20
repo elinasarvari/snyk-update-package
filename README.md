@@ -134,6 +134,7 @@ itself**: clone → Snyk scan → inventory → impact + plan. It **stops only w
 | something blocks it | what it asks for, e.g. install Snyk, pick the starting version, commit your local changes |
 
 Every stop ends with **Done this run / Stopped because / ▶ Next step**, so you always know what to do.
+What happens at each step, and every reason it can stop: **[What `/dep-run` does, step by step](#what-dep-run-does-step-by-step)**.
 
 **Or run the steps one by one**, each ending with its own **▶ Next step** (in Copilot, also a button under the reply):
 
@@ -156,6 +157,75 @@ and where it stands, open [`workflows/INDEX.md`](workflows/INDEX.md) or run **`/
 **6. Read the results** in `workflows/<id>/`. Start with `STATUS.md`.
 
 One git repo with several Java projects inside? See **[Monorepos, step by step](#monorepos-one-git-repo-several-projects-step-by-step)**.
+
+---
+
+## What `/dep-run` does, step by step
+
+`/dep-run <repo>` works through the steps by itself and stops only where it needs you. **Nothing is pushed to your
+repo** until you run `/dep-publish` yourself. The example uses `inventory-service`. Any name in `repos/repos.txt`, a
+git URL or a checkout of the repo works the same way.
+
+**Start.** It finds the repo in `repos/repos.txt`, adding it first if you gave a URL or a folder. Then it opens the
+**next workflow number** (e.g. Workflow 3, `wf-003`), or **resumes** the unfinished run for that repo. It tells you
+which workflow it is before doing anything else, and creates `workflows/wf-NNN-inventory-service/STATUS.md`.
+
+| # | Step | What happens | Goes on by itself? |
+|---|------|--------------|--------------------|
+| 0 | Clone | Updates (or clones) `repos/inventory-service/` and creates branch `deps/wf-NNN` from the latest main. Your own checkout is never touched | ✅ |
+| 1 | Snyk scan | Scans every `pom.xml`. Not logged in? Your browser opens for SSO, then it scans again. Lists every flagged package: version, severity, CVEs, fixed-in, dependency paths. Default scope: **every finding with a fix** (change it by replying `scope: ...`) | ✅ (no findings: the run ends, nothing to do) |
+| 2 | Inventory | Reads every pom's declared versions and properties and the resolved dependency tree, then runs a **baseline build** of the repo before any change | ✅ |
+| 3 | Impact + plan | Finds breaking changes in **your** code with file:line, then writes `03-plan.md`, itemizing every vulnerable module | ⏸ **STOP 1: always** |
+| 4 | Apply | Edits poms and code in `repos/inventory-service/` on `deps/wf-NNN`, compiling after each plan step. Nothing is committed | ✅ after you approve |
+| 5 | Verify | Build, tests (every module's) and app start (if `smoke=true`), compared with the baseline | ⏸ **STOP 2: always** |
+| 6 | Publish | Commits, pushes `deps/wf-NNN`, opens the PR | ❌ never: only your own `/dep-publish` |
+
+**At STOP 1 (the plan is ready):**
+
+1. Open `workflows/wf-NNN-inventory-service/03-plan.md` ([how to read it](#reviewing-the-plan-vulnerable-modules-step-by-step)).
+2. Reply `/dep-run inventory-service approve` (Copilot: the *Approve* button), or say what to change, e.g.
+   `/dep-run inventory-service scope: high+`.
+3. It applies the plan, then verifies.
+
+**At STOP 2 (verification finished):**
+
+| Result | You run |
+|--------|---------|
+| Green | `/dep-publish wf-NNN`: commits, pushes the branch, opens the PR |
+| Red | Read the proposed fixes, then reply `/dep-run inventory-service approve fixes`: they're added to the plan, applied and verified again |
+
+**It also stops when something blocks it**, and says what to do:
+
+| Stops because | What you do |
+|---------------|-------------|
+| The clone failed, or there's no `main` branch | Check the URL and your access, or add `branch=<name>` to the repo's line |
+| BLOCKED: another workflow's changes aren't published | Publish or abandon that workflow first (the message names it) |
+| The Snyk CLI is missing, or the login didn't finish | Install the CLI or retry the login ([Logging in to Snyk](#logging-in-to-snyk-step-by-step)), or pass a Snyk export: `/dep-run inventory-service path/to/snyk.json` |
+| The **baseline build is red** | Fix the build on main first: an upgrade can't be checked on top of a broken build |
+| A target version doesn't exist, or the inventory needs a decision | Reply with your decision, e.g. `/dep-run inventory-service proceed from 3.3.2` |
+| A plan step stays red after two fix rounds | Read the apply log and decide |
+
+**Every stop ends with the same reply**, so you always know the next command:
+
+```text
+Workflow 3 (wf-003) · inventory-service · workflows/wf-003-inventory-service
+
+Done this run:     0 Clone ✅ · 1 Scan ✅ (12 packages, 3 changes) · 2 Inventory ✅ · 3 Plan ⏸
+Stopped because:   the plan is ready for your review
+
+▶ Next step:       read workflows/wf-003-inventory-service/03-plan.md, then reply "approve"
+                   /dep-run inventory-service approve
+```
+
+**Good to know:**
+
+- **Start a fresh chat after each stop.** It's cheaper, and `/dep-run inventory-service` resumes from `STATUS.md`.
+  The run reads the step files, not the chat.
+- **At each stop it saves the workflow's records** (`workflows.py save`). While this repo is public, the save is
+  refused and the reply says so. The records stay on your machine until you make the repo private and run
+  `/dep-save <id>` ([Saving workflow results](#saving-workflow-results-into-the-repository)).
+- **Where the changes are:** `git -C repos/inventory-service diff main...deps/wf-NNN`, or open the folder in VS Code.
+- **Where it stands:** `STATUS.md` in the workflow folder, [`workflows/INDEX.md`](workflows/INDEX.md), or `/dep-upgrade status`.
 
 ---
 
