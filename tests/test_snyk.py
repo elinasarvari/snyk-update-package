@@ -250,12 +250,12 @@ class VulnerableModules(Sandbox):
 
 
 class ModulesIntoPlan(Sandbox):
-    """--into-plan: the script puts the itemized modules into 03-plan.md, so nobody re-types them (token budget)."""
+    """--into-plan: the script puts the itemized modules into 02-plan.md, so nobody re-types them (token budget)."""
 
     def setUp(self):
         super().setUp()
         self.report = self.write("in/r.json", json.dumps({"projectName": "com.example:app", "vulnerabilities": [H2, NOFIX]}))
-        self.plan = self.write("plan.md", self.read("toolkit/templates/03-plan.md"))
+        self.plan = self.write("plan.md", self.read("toolkit/templates/02-plan.md"))
 
     def test_modules_replace_the_placeholder_section_and_leave_the_rest_alone(self):
         before = self.read(self.plan)
@@ -300,7 +300,7 @@ class EfficientPlanning(Sandbox):
                    [], ["3.1"], ["CVE-2026-0102"], upgradable=False)
         self.write("wf/snyk/app.json", json.dumps({"projectName": "com.example:app", "vulnerabilities": [up, pin, NOFIX]}))
         self.write("wf/snyk/findings.json", "{}")                               # our own output, must be ignored
-        self.plan = self.write("wf/03-plan.md", self.read("toolkit/templates/03-plan.md"))
+        self.plan = self.write("wf/02-plan.md", self.read("toolkit/templates/02-plan.md"))
         self.helpers = os.path.join(self.root, "toolkit", "scripts", "script-helpers.py")
 
     def helper(self, *args, **kw):
@@ -337,7 +337,7 @@ class EfficientPlanning(Sandbox):
         check = self.helper("plan-check", self.plan)
         self.assertEqual(check.returncode, 1)
         self.assertIn("3 of 3 modules still have open decisions", check.stdout)
-        self.helper("plan-decide", self.plan, "all", "In scope?=yes", "Compatibility / risk=see 03-impact.md | low", check=True)
+        self.helper("plan-decide", self.plan, "all", "In scope?=yes", "Compatibility / risk=see Impact | low", check=True)
         self.helper("plan-decide", self.plan, "1-2", "Plan step(s)=Step 1", check=True)
         self.helper("plan-decide", self.plan, "status:fixable by upgrade", "Target version=1.1", check=True)
         self.helper("plan-decide", self.plan, "2", "Target version=3.1", check=True)
@@ -349,7 +349,7 @@ class EfficientPlanning(Sandbox):
         done = self.helper("plan-check", self.plan)
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertIn("all 3 modules decided", done.stdout)
-        self.assertIn("| Compatibility / risk | see 03-impact.md / low |", self.read(self.plan), "| in a value can't break the table")
+        self.assertIn("| Compatibility / risk | see Impact / low |", self.read(self.plan), "| in a value can't break the table")
 
     def test_plan_decide_rejects_unknown_fields_and_empty_selections(self):
         self.script("parse-snyk.py", os.path.join(self.root, "wf", "snyk", "*.json"), "--into-plan", self.plan, check=True)

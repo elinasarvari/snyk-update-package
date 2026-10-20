@@ -1,7 +1,8 @@
-# /dep-login: log the Snyk CLI in with OAuth2
+# Snyk login: log the Snyk CLI in with OAuth2
 
 Logs the Snyk CLI in, the same SSO login the VS Code extension does when you click "Authenticate", started from
-here. Run it on its own (`/dep-login`), or let `/dep-scan` / `/dep-run` start it when the CLI isn't logged in.
+here. No separate command: `/dep-scan` and `/dep-run` run this when the CLI isn't logged in, and the user can run the
+script by hand.
 The script is `toolkit/scripts/snyk-login.sh` (Windows: `snyk-login.ps1`). Options are listed at the top of it.
 
 ## Steps

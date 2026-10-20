@@ -19,10 +19,10 @@ Usage:
     python3 -I parse-snyk.py <report.json> [more.json ...]
                              [--md out.md] [--json out.json] [--csv out.csv] [--modules out.md]
 
---modules writes the "Vulnerable modules" section for 03-plan.md: one itemized entry per vulnerable
+--modules writes the "Vulnerable modules" section for 02-plan.md: one itemized entry per vulnerable
 module (facts, every Snyk issue, every path) with the decision fields left for the plan to fill in.
 --index writes a one-line-per-module summary (what the plan step reads first).
---into-plan <03-plan.md> puts that section straight into the plan (replacing its "## Vulnerable modules"
+--into-plan <02-plan.md> puts that section straight into the plan (replacing its "## Vulnerable modules"
 section), so nobody has to copy it by hand. Decision tables already filled in are kept when it runs again.
 
 Accepts both shapes Snyk emits: a single project object, or a list (`--all-projects`).
@@ -340,7 +340,7 @@ def to_markdown(packages, changes, totals, projects):
 
 
 def to_modules(packages):
-    """The itemized "Vulnerable modules" section of 03-plan.md. Facts are filled in; decisions are {{placeholders}}."""
+    """The itemized "Vulnerable modules" section of 02-plan.md. Facts are filled in; decisions are {{placeholders}}."""
     out = ["## Vulnerable modules", "",
            "One entry per vulnerable module, generated from the Snyk scan, so none can be missed. The plan fills in the",
            "**Decision** table of every module in scope; a module left out of scope says so and points to its row in",
@@ -390,7 +390,7 @@ def to_modules(packages):
                 "| Fix chosen | %s |" % fix_chosen,
                 "| Target version | %s |" % target_row,
                 "| Plan step(s) | {{Step n, …: every path above is covered}} |",
-                "| Compatibility / risk | {{what could break, with evidence from 03-impact.md}} |",
+                "| Compatibility / risk | {{what could break, with evidence from the Impact section}} |",
                 "| Verified by | Snyk re-scan shows %s gone · build and tests green |" % ", ".join(d["id"] for d in p["issue_details"]),
                 ""]
     return "\n".join(out)

@@ -1,5 +1,8 @@
 # Phase 0 — Clone the repos and put them on the workflow's branch
 
+Run by `/dep-run` (step 0) and by `/dep-scan` when a repo isn't cloned yet. There's no separate command: by hand it's
+`repos.py add` / `repos.py clone` (`repos/README.md`).
+
 Every repo is cloned into `repos/<name>/`. **All code changes happen in that clone**, on the workflow's
 own branch `deps/<id>`, created from the latest main. The user's own checkouts elsewhere are never
 touched. This phase never discards, resets or stashes anything.
@@ -34,4 +37,4 @@ touched. This phase never discards, resets or stashes anything.
    `ON deps/<id>?` column. Confirm each `build_dir` from `repos.py list` contains `pom.xml` or `build.gradle*`.
 4. **If inside a workflow:** record each repo's clone, branch and start commit in the STATUS "Repos" table, then
    `python3 -I toolkit/scripts/workflows.py phase <id> 0 done`.
-5. Reply with the status table, anything the user must act on, and **▶ Next step** (usually `/dep-scan`).
+5. Report the status table and anything the user must act on, then continue with the scan.

@@ -11,7 +11,7 @@ Usage (from the project root):
         -> prints id and folder; --repo limits the run to those repos (writes the run's own repos.txt)
     python3 -I toolkit/scripts/workflows.py resolve <ref>        # 1 | 001 | wf-1 | wf-001 | wf-001-slug -> folder
     python3 -I toolkit/scripts/workflows.py list                 # all workflows: step, state, next step
-    python3 -I toolkit/scripts/workflows.py phase <ref> <0-6> <todo|running|done|blocked|waiting|skipped> [--note N]
+    python3 -I toolkit/scripts/workflows.py phase <ref> <0-5> <todo|running|done|blocked|waiting|skipped> [--note N]
     python3 -I toolkit/scripts/workflows.py next <ref> "<next step text>"
     python3 -I toolkit/scripts/workflows.py log <ref> "<event>"
     python3 -I toolkit/scripts/workflows.py index                # rebuild workflows/INDEX.md
@@ -183,7 +183,7 @@ def rebuild_index():
         "",
         "| # | Id | Title | Started | Current step | ▶ Next step |",
         "|---|----|-------|---------|--------------|-------------|",
-    ] + (rows or ["| | _no workflows yet: start one with `/dep-scan` or `/dep-upgrade`_ | | | | |"])) + "\n")
+    ] + (rows or ["| | _no workflows yet: start one with `/dep-run <repo>` or `/dep-scan`_ | | | | |"])) + "\n")
 
 
 def manifest_lines(path):
@@ -443,7 +443,7 @@ def main():
     p.set_defaults(func=cmd_new)
     p = sub.add_parser("resolve"); p.add_argument("ref"); p.set_defaults(func=cmd_resolve)
     p = sub.add_parser("list"); p.set_defaults(func=cmd_list)
-    p = sub.add_parser("phase"); p.add_argument("ref"); p.add_argument("number", type=int, choices=range(0, 7))
+    p = sub.add_parser("phase"); p.add_argument("ref"); p.add_argument("number", type=int, choices=range(0, 6))
     p.add_argument("state", choices=sorted(STATES)); p.add_argument("--note"); p.set_defaults(func=cmd_phase)
     p = sub.add_parser("next"); p.add_argument("ref"); p.add_argument("text"); p.set_defaults(func=cmd_next)
     p = sub.add_parser("log"); p.add_argument("ref"); p.add_argument("event"); p.set_defaults(func=cmd_log)

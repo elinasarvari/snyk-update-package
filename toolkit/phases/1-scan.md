@@ -15,7 +15,8 @@ upgraded in isolation. Read-only.
    `python3 -I toolkit/scripts/workflows.py new <slug> --title "<title>" --source "<Snyk report / manual>"`. The slug comes from the
    main package, or `snyk-sweep`. Tell the user the new id ("This is Workflow N: `wf-NNN`"). Then
    `python3 -I toolkit/scripts/workflows.py phase <id> 1 running`.
-2. **Repo folders:** if any repo in the list has no folder yet (URL not cloned, or wrong local path), run phase 0 first.
+2. **Repo folders:** if any repo in the list has no folder yet (URL not cloned, or wrong local path), run phase 0 first
+   (`toolkit/phases/0-clone.md`).
 3. **Scan** (only when no report was supplied):
    `bash toolkit/scripts/snyk-scan.sh workflows/<id>/snyk [--manifest workflows/<id>/repos.txt] [--org=<org>]`
    - The script prints `Using Snyk CLI: <path>`. It takes `$SNYK_CLI` (e.g. the CLI the Snyk VS Code extension
@@ -44,11 +45,11 @@ upgraded in isolation. Read-only.
      names an upgrade of that path's direct dependency that fixes it. The script uses that version, marked
      `(Snyk remediation)`; treat it like any other upgrade.
    - **override:** Snyk has no upgrade path, but a fixed version exists (or Snyk suggests a pin). The vulnerable package
-     itself gets forced to that version (`<dependencyManagement>` / Gradle constraints). Compatibility is checked in step 3.
-   - **none:** no remediation on that path. It's examined in step 3 (the lowest newer introducing library that drops it, exclusion) before
+     itself gets forced to that version (`<dependencyManagement>` / Gradle constraints). Compatibility is checked in the plan step.
+   - **none:** no remediation on that path. It's examined in the plan step (the lowest newer introducing library that drops it, exclusion) before
      anything is declared out of scope.
    A package whose status is **needs an override** or **partly fixable** has paths that the obvious upgrade does
    **not** fix: call those out, since they're the ones that get missed.
 6. **Close out:** `python3 -I toolkit/scripts/workflows.py phase <id> 1 done`, then `python3 -I toolkit/scripts/workflows.py next <id> "..."`. ▶ Next step: "pick the scope (`all`, a severity floor such as
-   `high+`, or specific rows), then `/dep-inventory <id>`". Reply with the severity totals, the
+   `high+`, or specific rows), then `/dep-plan <id>`". Reply with the severity totals, the
    triaged table 2, and the next step.

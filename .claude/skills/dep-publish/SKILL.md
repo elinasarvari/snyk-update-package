@@ -1,6 +1,6 @@
 ---
 name: dep-publish
-description: "Phase 6 - commits the verified changes in each clone, pushes deps/<workflow-id> and opens a pull request per target repo with a description built from the upgrade docs; records PR links in 06-publish.md. Only when the user asks."
+description: "Step 5 - commits the verified changes in each clone, pushes deps/<workflow-id> and opens a pull request per target repo with a description built from the workflow docs; records commits and PR links in STATUS.md. Only when the user asks."
 argument-hint: "<workflow-id> [repo-name ...]"
 disable-model-invocation: true
 ---
@@ -9,7 +9,7 @@ disable-model-invocation: true
 # dep-publish
 
 1. Read `toolkit/WORKFLOW.md` (layout, gates, principles).
-2. Follow `toolkit/phases/6-publish.md` step by step. `$ARGUMENTS` is the input.
+2. Follow `toolkit/phases/5-publish.md` step by step. `$ARGUMENTS` is the input.
 3. Templates are in `toolkit/templates/`, scripts in `toolkit/scripts/`. Run commands from the project root.
 4. Check the gate in the phase file first; if it fails, stop and explain.
 

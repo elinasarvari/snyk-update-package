@@ -1,4 +1,7 @@
-# /dep-save: push a workflow's records to this project's repository
+# Saving: push a workflow's records to this project's repository
+
+No separate command: every step runs this as its last action, and the user can run it by hand with
+`python3 -I toolkit/scripts/workflows.py save <id>`.
 
 Commits one workflow's folder (`workflows/wf-NNN-…/`), plus `workflows/INDEX.md` and the research cache, and pushes
 it to `snyk-update-package`'s own remote, so the documentation is on GitHub instead of only on one machine.

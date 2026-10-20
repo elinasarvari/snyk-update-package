@@ -14,9 +14,9 @@ import unittest
 
 from helpers import ON_WINDOWS, POWERSHELL, PROJECT
 
-PHASES = ["dep-clone", "dep-scan", "dep-inventory", "dep-analyze", "dep-apply", "dep-verify", "dep-publish"]
-COMMANDS = ["dep-upgrade", "dep-run", "dep-login", "dep-save"] + PHASES
-SUBAGENTS = ["dependency-analyst", "upgrade-applier", "repo-verifier"]
+PHASES = {1: "dep-scan", 2: "dep-plan", 3: "dep-apply", 4: "dep-verify", 5: "dep-publish"}   # step 0 is part of /dep-run
+COMMANDS = ["dep-run"] + list(PHASES.values())
+SUBAGENTS = ["dependency-analyst", "upgrade-applier"]
 MANUAL_ONLY = ["dep-apply", "dep-publish", "dep-run"]   # can change code or push: user-started only
 
 
@@ -103,16 +103,21 @@ class CommandsExistEverywhere(unittest.TestCase):
                 self.assertTrue(os.path.isfile(os.path.join(PROJECT, rel)), rel)
 
     def test_each_phase_command_runs_its_own_phase_file(self):
-        for n, name in enumerate(PHASES):
+        for n, name in PHASES.items():
             phase_files = [f for f in os.listdir(os.path.join(PROJECT, "toolkit", "phases")) if f.startswith("%d-" % n)]
             self.assertEqual(len(phase_files), 1, "exactly one toolkit/phases/%d-*.md" % n)
             for rel in (".github/agents/%s.agent.md" % name, ".claude/skills/%s/SKILL.md" % name):
                 self.assertIn("toolkit/phases/%s" % phase_files[0], read(rel), rel)
 
-    def test_status_template_tracks_exactly_the_seven_steps(self):
+    def test_only_the_six_commands_exist(self):
+        self.assertEqual(sorted(os.listdir(os.path.join(PROJECT, ".claude", "skills"))), sorted(COMMANDS))
+        prompts = sorted(f[:-len(".prompt.md")] for f in os.listdir(os.path.join(PROJECT, ".github", "prompts")))
+        self.assertEqual(prompts, sorted(COMMANDS))
+
+    def test_status_template_tracks_exactly_the_six_steps(self):
         rows = re.findall(r"^\|\s*(\d)\s*\|[^|]*\|\s*`/(dep-[a-z]+)`", read("toolkit/templates/STATUS.md"), re.M)
-        self.assertEqual([int(n) for n, _ in rows], list(range(7)))
-        self.assertEqual([cmd for _, cmd in rows], PHASES)
+        self.assertEqual([int(n) for n, _ in rows], list(range(6)))
+        self.assertEqual([cmd for _, cmd in rows], ["dep-run"] + list(PHASES.values()))
         for placeholder in ("{{WORKFLOW_ID}}", "{{NUMBER}}", "{{TITLE}}", "{{DATE}}", "{{SOURCE}}"):
             self.assertIn(placeholder, read("toolkit/templates/STATUS.md"))
 
@@ -136,7 +141,6 @@ class FrontmatterAndLinks(unittest.TestCase):
         for f in os.listdir(os.path.join(PROJECT, ".claude", "agents")):
             data, _ = frontmatter(".claude/agents/" + f)
             self.assertEqual(data["name"], f[:-3])
-        frontmatter(".github/skills/dep-upgrade/SKILL.md")
         frontmatter(".github/instructions/maven-dependencies.instructions.md")
 
     def test_handoffs_and_subagent_lists_point_at_real_agents(self):
@@ -183,7 +187,7 @@ class SafetyRules(unittest.TestCase):
 
     def test_autopilot_stops_for_approval_and_never_publishes(self):
         run = read("toolkit/RUN.md")
-        self.assertIn("**always stop after writing `03-plan.md`**", run)
+        self.assertIn("**always stop after writing `02-plan.md`**", run)
         self.assertIn("**never run it from here**", run)
         self.assertIn("Never** tick the approval box without the user's explicit words", run)
         for n in range(6):
@@ -199,11 +203,11 @@ class SafetyRules(unittest.TestCase):
 
     def test_read_only_roles_say_so_and_apply_requires_approval(self):
         self.assertIn("never modify", read("toolkit/roles/dependency-analyst.md"))
-        self.assertIn("You do not fix anything", read("toolkit/roles/repo-verifier.md"))
-        self.assertIn("- [x] Approved by user", read("toolkit/phases/4-apply.md"))
+        self.assertIn("Changes no source", read("toolkit/phases/4-verify.md"))
+        self.assertIn("- [x] Approved by user", read("toolkit/phases/3-apply.md"))
         self.assertIn("- [x] Approved by user", read("toolkit/roles/upgrade-applier.md"))
-        self.assertIn("Never tick the approval box yourself", read("toolkit/phases/3-analyze.md"))
-        for rel in ("toolkit/roles/upgrade-applier.md", "toolkit/phases/5-verify.md", "toolkit/WORKFLOW.md"):
+        self.assertIn("Never tick the approval box yourself", read("toolkit/phases/2-plan.md"))
+        for rel in ("toolkit/roles/upgrade-applier.md", "toolkit/phases/4-verify.md", "toolkit/WORKFLOW.md"):
             self.assertRegex(read(rel), r"(?i)never (re-run with tests skipped|hide red|delete or skip tests)|skip", rel)
 
 
@@ -280,9 +284,9 @@ class TargetVersionsComeFromSnyk(unittest.TestCase):
 
     def test_the_rule_is_stated_where_versions_are_chosen(self):
         self.assertIn("Target versions are Snyk's, exactly", read("toolkit/WORKFLOW.md"))
-        self.assertIn("exactly Snyk's version", read("toolkit/phases/2-inventory.md"))
-        self.assertIn("only at versions Snyk names or the user gives", read("toolkit/phases/3-analyze.md"))
-        self.assertIn("Versions not from Snyk", read("toolkit/templates/03-plan.md"))
+        self.assertIn("exactly Snyk's version", read("toolkit/phases/2-plan.md"))
+        self.assertIn("only at versions Snyk names or the user gives", read("toolkit/phases/2-plan.md"))
+        self.assertIn("Versions not from Snyk", read("toolkit/templates/02-plan.md"))
         self.assertIn("Snyk's version", read("toolkit/roles/dependency-analyst.md"))
         self.assertIn("never a newer", read("toolkit/roles/upgrade-applier.md"))
 
@@ -291,23 +295,23 @@ class RemediationAndScope(unittest.TestCase):
     """Nothing in scope is silently dropped: every path gets a fix or an explained out-of-scope entry."""
 
     def test_plan_follows_the_remediation_order_and_covers_every_path(self):
-        text = read("toolkit/phases/3-analyze.md")
+        text = read("toolkit/phases/2-plan.md")
         for must in ("Remediation order", "**upgrade**", "**override**", "**excluded**", "Path coverage table",
                      "**Out of scope**"):
             self.assertIn(must, text)
-        plan = read("toolkit/templates/03-plan.md")
+        plan = read("toolkit/templates/02-plan.md")
         self.assertIn("## Path coverage", plan)
         self.assertIn("| # | What | Kind | Paths affected | Remediation tried | Why not now | Next step / owner |", plan)
 
     def test_plan_itemizes_every_vulnerable_module(self):
         self.assertIn("--modules workflows/<id>/snyk/vulnerable-modules.md", read("toolkit/phases/1-scan.md"))
-        self.assertIn("Vulnerable modules, itemized", read("toolkit/phases/3-analyze.md"))
-        self.assertIn("--into-plan", read("toolkit/phases/3-analyze.md"))
-        for must in ("module-index.md", "plan-decide", "plan-check", "all N\n        modules decided"):
-            self.assertIn(must, read("toolkit/phases/3-analyze.md"))
+        self.assertIn("Vulnerable modules, itemized", read("toolkit/phases/2-plan.md"))
+        self.assertIn("--into-plan", read("toolkit/phases/2-plan.md"))
+        for must in ("module-index.md", "plan-decide", "plan-check", "all N\n         modules decided"):
+            self.assertIn(must, read("toolkit/phases/2-plan.md"))
         self.assertIn("only once `plan-check` says every module is decided", read("toolkit/RUN.md"))
-        self.assertIn("## Vulnerable modules", read("toolkit/templates/03-plan.md"))
-        self.assertIn("## Vulnerable modules: before → after", read("toolkit/templates/05-verification.md"))
+        self.assertIn("## Vulnerable modules", read("toolkit/templates/02-plan.md"))
+        self.assertIn("## Vulnerable modules: before → after", read("toolkit/templates/04-verification.md"))
 
     def test_findings_link_the_generated_tables_instead_of_copying_them(self):
         tpl = read("toolkit/templates/01-snyk-findings.md")
@@ -318,8 +322,8 @@ class RemediationAndScope(unittest.TestCase):
         self.assertIn("**link** the generated tables, don't copy", read("toolkit/phases/1-scan.md"))
 
     def test_leftover_findings_are_checked_and_reported(self):
-        self.assertIn("must be in `03-plan.md` → Out of scope", read("toolkit/phases/5-verify.md"))
-        self.assertIn("Known remaining issues", read("toolkit/phases/6-publish.md"))
+        self.assertIn("must be in `02-plan.md` → Out of\n   scope", read("toolkit/phases/4-verify.md"))
+        self.assertIn("Known remaining issues", read("toolkit/phases/5-publish.md"))
 
 
 class LeanOverview(unittest.TestCase):
@@ -329,9 +333,8 @@ class LeanOverview(unittest.TestCase):
         overview = read("toolkit/WORKFLOW.md")
         self.assertNotIn("## Orchestrating", overview)
         self.assertNotIn("## Layout", overview)
-        self.assertIn("## Steps", read("toolkit/UPGRADE.md"))
         self.assertIn("## Layout", read("toolkit/REFERENCE.md"))
-        self.assertIn("toolkit/UPGRADE.md", read(".claude/skills/dep-upgrade/SKILL.md"))
+        self.assertIn("/dep-run status", read("toolkit/RUN.md"), "status lives in /dep-run (no /dep-upgrade)")
         self.assertLess(len(overview), 11000, "keep the always-read overview under ~2.75k tokens")
 
 
@@ -347,15 +350,15 @@ class TokenBudget(unittest.TestCase):
 
     def test_research_is_cached_and_reused(self):
         self.assertIn("workflows/_research/", read("toolkit/roles/dependency-analyst.md"))
-        self.assertIn("Research once", read("toolkit/phases/3-analyze.md"))
+        self.assertIn("Research once", read("toolkit/phases/2-plan.md"))
         self.assertIn("workflows/_research/", read(".gitignore"))
 
-    def test_mechanical_subagent_uses_the_small_model(self):
-        data, _ = frontmatter(".claude/agents/repo-verifier.md")
-        self.assertEqual(data.get("model"), "haiku")
-        for name in ("dependency-analyst", "upgrade-applier"):          # these need the session's (strong) model
+    def test_verify_reads_summaries_and_first_errors_not_whole_logs(self):
+        text = read("toolkit/phases/4-verify.md")
+        self.assertIn("first-errors", text)
+        self.assertIn("never from whole logs", text)
+        for name in SUBAGENTS:                                          # these need the session's (strong) model
             self.assertNotIn("model", frontmatter(".claude/agents/%s.md" % name)[0])
-        self.assertIn("first-errors", read("toolkit/roles/repo-verifier.md"))
 
     def test_test_runners_are_compact_by_default(self):
         self.assertNotIn('"${@:--v}"', read("tests/run.sh"))

@@ -8,8 +8,8 @@ writes them: never a newer or "latest" version, never a range.
 
 - `repo` — absolute path to the clone (`repos/<name>`); git commands run here. Never edit any other copy of the repo
 - `build_dir` — absolute path holding the pom / build file; build commands run here
-- `plan` — absolute path to `03-plan.md` (only the steps for this repo apply)
-- `log` — absolute path of the apply log to append to (`04-apply-log.md`)
+- `plan` — absolute path to `02-plan.md` (only the steps for this repo apply)
+- `log` — absolute path of the apply log to append to (`03-apply-log.md`)
 - `branch` — the workflow's branch, `deps/<workflow-id>`, e.g. `deps/wf-001`
 
 ## Procedure
@@ -31,7 +31,7 @@ writes them: never a newer or "latest" version, never a range.
    - Append to the log: step #, files changed, `git diff --stat`, verification result.
    - If verification fails: diagnose from the first error. You may make a **minimal fix
      that is clearly a direct consequence of the same step** (e.g. an import that moved
-     package as documented in 03-impact.md) and log it as a deviation with its reason.
+     package as documented in the plan's Impact section) and log it as a deviation with its reason.
      Anything else → stop, log the error, and report back. Do not attempt more than
      two fix rounds per step.
 4. **Do not commit, push, or open PRs.** That is `/dep-publish`'s job. Leave changes in the

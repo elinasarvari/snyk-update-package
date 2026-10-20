@@ -69,27 +69,27 @@ class StepsHistoryIndex(Sandbox):
         self.assertEqual(self.row(2)[3], "⛔ blocked (version mismatch)")
         text = self.read(self.status)
         self.assertIn("Step 1 Snyk scan → 🟡 in progress", text)
-        self.assertIn("Step 2 Inventory → ⛔ blocked: version mismatch", text)
+        self.assertIn("Step 2 Plan (approval) → ⛔ blocked: version mismatch", text)
         index = self.read("workflows/INDEX.md")
         self.assertIn("[`wf-001`](wf-001-spring-boot/STATUS.md)", index)
         self.assertIn("0 Clone target repos: ⬜ not started", index, "current step = first step not done")
 
     def test_skipped_and_done_steps_are_passed_over_in_the_index(self):
-        for n in range(0, 7):
+        for n in range(0, 6):
             self.script("workflows.py", "phase", "1", str(n), "skipped" if n == 1 else "done", check=True)
         self.assertIn("all steps done ✅", self.read("workflows/INDEX.md"))
 
     def test_invalid_step_or_state_is_rejected(self):
-        self.assertNotEqual(self.script("workflows.py", "phase", "1", "7", "done").returncode, 0)
+        self.assertNotEqual(self.script("workflows.py", "phase", "1", "6", "done").returncode, 0)
         self.assertNotEqual(self.script("workflows.py", "phase", "1", "1", "finished").returncode, 0)
 
     def test_next_replaces_the_next_step_section(self):
         self.script("workflows.py", "next", "1", "Run `/dep-scan wf-001`", check=True)
-        self.script("workflows.py", "next", "1", "Review 03-plan.md", check=True)
+        self.script("workflows.py", "next", "1", "Review 02-plan.md", check=True)
         text = self.read(self.status)
         section = text.split("## ▶ Next step", 1)[1].split("## ", 1)[0]
-        self.assertEqual(section.strip(), "Review 03-plan.md")
-        self.assertIn("Review 03-plan.md", self.read("workflows/INDEX.md"))
+        self.assertEqual(section.strip(), "Review 02-plan.md")
+        self.assertIn("Review 02-plan.md", self.read("workflows/INDEX.md"))
 
     def test_log_appends_history_in_order(self):
         self.script("workflows.py", "log", "1", "Plan approved: \"approve\"", check=True)
@@ -139,7 +139,7 @@ class OneRepoRuns(Sandbox):
         self.new("svc", "--repo", "svc")                        # wf-003
         out = self.script("workflows.py", "find-open", "--repo", "svc", check=True).stdout.strip()
         self.assertEqual(out.split("\t")[0], "wf-003")
-        for n in range(7):                                      # finish wf-003
+        for n in range(6):                                      # finish wf-003
             self.script("workflows.py", "phase", "3", str(n), "done", check=True)
         self.assertEqual(self.script("workflows.py", "find-open", "--repo", "svc").returncode, 1,
                          "a finished run is not resumed; /dep-run starts wf-004")

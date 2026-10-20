@@ -47,13 +47,23 @@ the repository**. The only file you write is the report path you are given (in t
 
 ## Output
 
-Write `report` using the "Per package" section structure of
-`toolkit/templates/03-impact.md` (relative to the snyk-update-package root),
-plus a first line in this exact form so the orchestrator can build the summary table:
+Write `report` with a first line in this exact form, so the orchestrator can build the plan's Impact table:
 
 ```
 SUMMARY | <package> | <current> → <target> | <patch|minor|major> | <low|medium|high> | <n code sites> | <n config keys> | <S|M|L effort>
 ```
+
+Then these sections:
+
+- **Why:** the CVE / Snyk ids this fixes.
+- **Sources consulted:** the migration guides and release notes (URLs), or the `_research/` file used.
+- **Dependency impact:** who declares it, what manages its version, what else moves.
+- **Code impact:** a table `# | breaking change (source) | where (path:line) | required edit | confidence`, with
+  confidence `confirmed` (exact API/key found) · `likely` (pattern matches the docs) · `check` (needs the build to tell).
+- **Configuration impact:** renamed or removed `application*.properties|yml` keys found in the repo.
+- **Behaviour with no compile error:** changed defaults, things that only fail at runtime.
+- **Test impact:** test starters, annotations or APIs that change.
+- **Not affected:** changes from the guides that were checked and don't apply here (required).
 
 Then return a ≤15-line summary to the caller: risk, the top 3 required edits, coupled
 dependency changes, and anything you could not verify.

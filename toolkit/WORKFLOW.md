@@ -20,27 +20,28 @@ evidence, listed in the plan's *Versions not from Snyk* for the user to approve.
 the user means stop and ask.
 
 ```
-/dep-clone ─▶ /dep-scan ─▶ /dep-inventory ─▶ /dep-analyze ─▶ ⏸ approve ─▶ /dep-apply ─▶ /dep-verify ─▶ /dep-publish
- repos/    01-snyk-      02-inventory     03-impact       03-plan      04-apply-log   05-verification  06-publish
- repo folders  findings                       03-plan                      (deps/<id>)                     (commit+PR)
+/dep-run: 0 clone ─▶ 1 /dep-scan ─▶ 2 /dep-plan ─▶ ⏸ approve ─▶ 3 /dep-apply ─▶ 4 /dep-verify ─▶ ⏸ 5 /dep-publish
+          repos/     01-snyk-       02-plan                    03-apply-log     04-verification   commit + PR
+                     findings       (versions, impact, steps)  (deps/<id>)                        (links in STATUS)
 ```
 
 | # | Command | Procedure | Subagent (role) | Writes to target repos? |
 |---|---------|-----------|-----------------|-------------------------|
-| 0 | `/dep-clone` | [phases/0-clone.md](phases/0-clone.md) | — | clones into `repos/<name>/`; in a workflow, puts the clone on `deps/<id>` from the latest main |
+| 0 | (part of `/dep-run`; `/dep-scan` runs it when a repo isn't cloned) | [phases/0-clone.md](phases/0-clone.md) | — | clones into `repos/<name>/`; in a workflow, puts the clone on `deps/<id>` from the latest main |
 | 1 | `/dep-scan` | [phases/1-scan.md](phases/1-scan.md) | — | no |
-| 2 | `/dep-inventory` | [phases/2-inventory.md](phases/2-inventory.md) | — | no (build output only) |
-| 3 | `/dep-analyze` | [phases/3-analyze.md](phases/3-analyze.md) | `dependency-analyst` × (lever, repo) | no |
-| 4 | `/dep-apply` | [phases/4-apply.md](phases/4-apply.md) | `upgrade-applier` × repo | **yes**: edits on `deps/<id>`, uncommitted |
-| 5 | `/dep-verify` | [phases/5-verify.md](phases/5-verify.md) | `repo-verifier` × repo | no (build output only) |
-| 6 | `/dep-publish` | [phases/6-publish.md](phases/6-publish.md) | — | **yes**: commit, push, open PR |
-| — | `/dep-run <repo>` | [RUN.md](RUN.md): **autopilot**, every step for one repo; stops at approval, blockers, and before publish | all three | only after the user approves (via step 4) |
-| — | `/dep-upgrade` | [UPGRADE.md](UPGRADE.md) | any of the above | — |
+| 2 | `/dep-plan` | [phases/2-plan.md](phases/2-plan.md): versions + baseline, impact, steps | `dependency-analyst` × (lever, repo) | no (build output only) |
+| 3 | `/dep-apply` | [phases/3-apply.md](phases/3-apply.md) | `upgrade-applier` × repo | **yes**: edits on `deps/<id>`, uncommitted |
+| 4 | `/dep-verify` | [phases/4-verify.md](phases/4-verify.md) | — | no (build output only) |
+| 5 | `/dep-publish` | [phases/5-publish.md](phases/5-publish.md) | — | **yes**: commit, push, open PR |
+| — | `/dep-run <repo>` / `/dep-run status` | [RUN.md](RUN.md): **autopilot**, every step for one repo; stops at approval, blockers, and before publish. `status`: where every run stands | both | only after the user approves (via step 3) |
+
+Procedures without a command of their own: [LOGIN.md](LOGIN.md) (Snyk login, run by the scan when needed) and
+[SAVE.md](SAVE.md) (push the records, the last action of every step).
 
 ## Where things are
 
 Target repos: `repos/repos.txt` → clones in `repos/<name>/`. Each run: `workflows/wf-NNN-<slug>/`. Procedures:
-`toolkit/phases/`, `toolkit/roles/`, `toolkit/RUN.md`, `toolkit/UPGRADE.md`. Every script, its arguments and the folder
+`toolkit/phases/`, `toolkit/roles/`, `toolkit/RUN.md`. Every script, its arguments and the folder
 layout: `toolkit/REFERENCE.md` (read it only when a phase file doesn't already give the exact command).
 
 ## Token budget (read this, it saves a lot)

@@ -1,6 +1,6 @@
 ---
 name: dep-apply
-description: "Phase 4 - applies the USER-APPROVED 03-plan.md to each repo's clone under repos/ on branch deps/<workflow-id> via upgrade-applier subagents, compiling per step, logging to 04-apply-log.md. Edits the clones; never commits."
+description: "Step 3 - applies the USER-APPROVED 02-plan.md to each repo's clone under repos/ on branch deps/<workflow-id> via upgrade-applier subagents, compiling per step, logging to 03-apply-log.md. Edits the clones; never commits."
 argument-hint: "<workflow-id> [repo-name ...]"
 disable-model-invocation: true
 ---
@@ -9,7 +9,7 @@ disable-model-invocation: true
 # dep-apply
 
 1. Read `toolkit/WORKFLOW.md` (layout, gates, principles).
-2. Follow `toolkit/phases/4-apply.md` step by step. `$ARGUMENTS` is the input.
+2. Follow `toolkit/phases/3-apply.md` step by step. `$ARGUMENTS` is the input.
 3. Templates are in `toolkit/templates/`, scripts in `toolkit/scripts/`. Run commands from the project root.
 4. Subagents: Launch the agents in one message so they run in parallel - one `upgrade-applier` per item.
 5. Check the gate in the phase file first; if it fails, stop and explain.

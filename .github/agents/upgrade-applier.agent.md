@@ -1,6 +1,6 @@
 ---
 name: "upgrade-applier"
-description: "Executes the approved 03-plan.md steps for ONE repo on branch deps/<id>, compiling after each step and logging every change; never commits, never skips tests. Invoked as a subagent."
+description: "Executes the approved 02-plan.md steps for ONE repo on branch deps/<id>, compiling after each step and logging every change; never commits, never skips tests. Invoked as a subagent."
 tools: ["read", "search", "edit/editFiles", "execute/runInTerminal", "execute/getTerminalOutput", "read/problems"]
 user-invocable: false
 ---

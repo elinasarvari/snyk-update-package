@@ -1,20 +1,20 @@
 ---
 name: "dep-run"
-description: "Autopilot for ONE repo (name, git URL, or a local checkout to take the URL from): opens or resumes its workflow (wf-NNN), works in its clone under repos/ on branch deps/wf-NNN, and runs every step - clone, Snyk scan, inventory, impact + plan - then stops for your approval; after you approve, applies and verifies, then stops before publish. Always ends with what to do next."
-argument-hint: "<repo name | git URL | local checkout> [workflow id] [snyk.json] [your reply: approve | scope: ... | decision]"
+description: "Autopilot for ONE repo (name, git URL, or a local checkout to take the URL from): opens or resumes its workflow (wf-NNN), works in its clone under repos/ on branch deps/wf-NNN, and runs every step - clone, Snyk scan, plan - then stops for your approval; after you approve, applies and verifies, then stops before publish. Always ends with what to do next. '/dep-run status' shows where every workflow stands."
+argument-hint: "<repo name | git URL | local checkout | status> [workflow id] [snyk.json] [your reply: approve | scope: ... | decision]"
 tools: ["read", "search", "web/fetch", "execute/runInTerminal", "execute/getTerminalOutput", "edit/editFiles", "todo", "agent"]
-agents: ["dependency-analyst", "upgrade-applier", "repo-verifier"]
+agents: ["dependency-analyst", "upgrade-applier"]
 handoffs:
   - label: "Approve the plan and continue"
     agent: "dep-run"
-    prompt: "I have reviewed 03-plan.md for this workflow and approve it as written. Continue: apply and verify."
+    prompt: "I have reviewed 02-plan.md for this workflow and approve it as written. Continue: apply and verify."
     send: false
   - label: "Publish the PRs"
     agent: "dep-publish"
     prompt: "Verification is green. Commit, push and open PRs for this workflow."
     send: false
   - label: "Where does it stand?"
-    agent: "dep-upgrade"
+    agent: "dep-run"
     prompt: "status"
     send: false
 ---
@@ -25,7 +25,7 @@ handoffs:
 1. Read `toolkit/WORKFLOW.md` (layout, gates, principles).
 2. Follow `toolkit/RUN.md` step by step. The user's message is the input.
 3. Templates are in `toolkit/templates/`, scripts in `toolkit/scripts/`. Run commands from the project root.
-4. Subagents: Delegate with the agent tool - one `dependency-analyst` / `upgrade-applier` / `repo-verifier` per item.
+4. Subagents: Delegate with the agent tool - one `dependency-analyst` / `upgrade-applier` per item.
 5. Run the steps back to back; stop only at the stop points in `toolkit/RUN.md`. Never publish.
 
 Track the run with `toolkit/scripts/workflows.py` (`phase`, `next`, `log`; see "Tracking every run" in `toolkit/WORKFLOW.md`) and finish with `workflows.py save <id>`, which pushes the records. Never hand-edit the phase tracker or the index. Reply with the workflow id ("Workflow N, `wf-NNN`"), what was produced (links), the headline findings, and **▶ Next step**.
