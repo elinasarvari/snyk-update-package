@@ -98,6 +98,21 @@ Give it the repo's name in `repos.txt`, its git URL, or a local checkout. It ope
 | 5 | Verify | Build, every module's tests, app start (`smoke=true`), Snyk re-scan; compared with the baseline | ⏸ **always stops** |
 | 6 | Publish | Commit, push `deps/wf-NNN`, open the PR | only by your own `/dep-publish wf-NNN` |
 
+**What the analysis (step 3) does.** It turns the inventory into a list of **levers**: the dependencies you actually
+edit, per repo. Many Snyk rows that one parent/BOM manages are a single lever. For each lever, a `dependency-analyst`
+helper runs, all in parallel, and:
+
+- reads the official migration guides and release notes for **every version line crossed** (e.g. 3.3 → 3.4 → 3.5),
+  once per jump: the notes are cached in `workflows/_research/`, and later runs and repos reuse them;
+- searches your code, config, tests and poms (`git grep`, never `target/` or `node_modules/`) for each breaking change
+  and records it with `file:line`. Changes with no hit go on a required *checked, not affected* list;
+- checks coupled libraries the lever doesn't manage (e.g. Camel with Spring Boot) and the lowest version that works;
+- writes `analysis/<repo>--<artifact>.md`, never touching the repo.
+
+The reports are summarised in **`03-impact.md`** (per lever: jump type, risk, code sites, config keys, effort, with
+sources). The plan is then built from `03-impact.md` only: ordered steps that each compile (pom → coupled libraries →
+renamed artifacts → code → config → tests), exact diffs, and every vulnerable module inserted by script.
+
 **At the plan:** read `workflows/wf-NNN-<repo>/03-plan.md` ([what to check](#4-review-the-plan)), then reply
 `/dep-run <repo> approve` (Copilot: the *Approve* button), or say what to change.
 **At verify:** green → `/dep-publish wf-NNN`. Red → it lists fixes; reply `/dep-run <repo> approve fixes`.
@@ -162,7 +177,8 @@ out), so they're on GitHub and on your other machines after `git pull`. Save by 
 | `/dep-login` | Snyk CLI login (browser SSO) | no |
 | `/dep-upgrade status` | Where every workflow stands | no |
 | `/dep-save [id]` | Push a workflow's records to this repo (automatic at every stop) | no |
-| `/dep-clone`, `/dep-scan`, `/dep-inventory <id>`, `/dep-analyze <id>` | Steps 0–3 one by one (`/dep-scan path/to/snyk.json` reads an export) | no |
+| `/dep-clone`, `/dep-scan`, `/dep-inventory <id>` | Steps 0–2 one by one (`/dep-scan path/to/snyk.json` reads an export) | no |
+| `/dep-analyze <id>` | Step 3: the impact analysis and the plan ([what it does](#3-run-dep-run-repo)) | no |
 | `/dep-apply <id>` | Step 4: apply the approved plan on `deps/<id>` | **edits files**, uncommitted |
 | `/dep-verify <id>` | Step 5 (`/dep-verify baseline`: a health check outside any workflow) | no |
 | `/dep-publish <id>` | Step 6: commit, push, open the PRs | **commits, pushes, opens PRs** |
