@@ -1,46 +1,34 @@
 # workflows/: one folder per workflow run
 
-Every time you start the `/dep-*` workflow, the run gets the next **unique id** and its own folder.
-**The records are pushed to this repository** (`/dep-save`, automatic at every stop), so you can read them on GitHub
-and on any machine that pulls. Raw Snyk JSON, logs and error files are left out, because the documents summarise them.
-Keep the repository private: saving refuses while it's public.
+Each run gets the next **unique id** and its own folder. Ids are never reused (`workflows/.last-id` remembers the
+highest), and you can refer to a run as `1`, `wf-001` or its folder name. [`INDEX.md`](INDEX.md) lists every run
+with its current step and ▶ next step; it's rebuilt automatically.
 
-| Run | Id | Folder | Branch it creates in each repo |
-|-----|----|--------|--------------------------------|
+| Run | Id | Folder | Branch in each repo |
+|-----|----|--------|---------------------|
 | Workflow 1 | `wf-001` | `workflows/wf-001-<slug>/` | `deps/wf-001` |
-| Workflow 2 | `wf-002` | `workflows/wf-002-<slug>/` | `deps/wf-002` |
 
-- **Ids are never reused.** Even if you delete a folder, the next run gets a new number
-  (`workflows/.last-id` remembers the highest one).
-- **Refer to a run however you like:** `1`, `wf-1`, `wf-001`, or the folder name, e.g. `/dep-inventory 1`.
-- **`INDEX.md` lists every run** with its current step and ▶ next step. It's rebuilt automatically and pushed with
-  the records; don't edit it.
+The records are pushed to this repository at every stop (`/dep-save`; raw Snyk JSON, logs and error files are left
+out), and saving refuses while the repository is public.
 
-## Inside each run's folder
+## Inside a run's folder
 
 | File | Written by | Contains |
 |------|------------|----------|
-| `STATUS.md` | every step | **Start here.** Step tracker, ▶ next step, repos, decisions, and a timestamped **History** of everything that happened |
-| `01-snyk-findings.md` | `/dep-scan` | Every package Snyk flags |
-| `02-inventory.md` | `/dep-inventory` | Current vs target versions, what moves with them, baseline build |
-| `03-impact.md`, `03-plan.md` | `/dep-analyze` | What breaks and where; the step-by-step plan you approve |
-| `04-apply-log.md` | `/dep-apply` | What changed |
-| `05-verification.md` | `/dep-verify` | Build, tests and boot, before vs after |
-| `06-publish.md` | `/dep-publish` | Commits and PR links |
-| `snyk/`, `facts/`, `analysis/`, `verification/` | the steps above | The raw evidence behind each document |
+| `STATUS.md` | every step | **Start here.** Step tracker, ▶ next step, repos, decisions, timestamped History |
+| `01-snyk-findings.md` | scan | Every flagged package, the changes to make, links to the full tables in `snyk/` |
+| `02-inventory.md` | inventory | Current vs target, what sets each version, what moves with it, coupled libraries, baseline |
+| `03-impact.md` | analyze | What breaks and where (`file:line`), with sources |
+| `03-plan.md` | analyze | Every vulnerable module with its decision, the ordered steps, path coverage, out of scope, your approval |
+| `04-apply-log.md` | apply | What changed per step, and any deviation |
+| `05-verification.md` | verify | Build, tests, boot and Snyk before vs after; every module ✅ / ➖ / ⛔; the verdict |
+| `06-publish.md` | publish | Commits and PR links |
+| `snyk/` | scan | `findings.{md,csv,json}`, `vulnerable-modules.md`, `module-index.md` (raw JSON stays local) |
+| `facts/<repo>/`, `analysis/`, `verification/{baseline,after}/<repo>/` | inventory, analyze, verify | The evidence behind the documents |
 
-## From the terminal
+Migration research is cached in `workflows/_research/` and reused by later runs.
 
 ```bash
-python3 -I toolkit/scripts/workflows.py list            # all runs, current step
-python3 -I toolkit/scripts/workflows.py resolve 1       # folder of Workflow 1
-python3 -I toolkit/scripts/workflows.py new my-slug --title "..."   # start a run by hand
-```
-
-Windows (PowerShell):
-
-```powershell
-py -3 -I toolkit\scripts\workflows.py list            # all runs, current step
-py -3 -I toolkit\scripts\workflows.py resolve 1       # folder of Workflow 1
-py -3 -I toolkit\scripts\workflows.py new my-slug --title "..."   # start a run by hand
+python3 -I toolkit/scripts/workflows.py list         # every run and its step
+python3 -I toolkit/scripts/workflows.py resolve 1    # the folder of Workflow 1
 ```

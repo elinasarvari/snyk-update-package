@@ -91,16 +91,6 @@ stateDiagram-v2
     class Clone,Scan,Inventory,Analyze,Apply,Verify auto
 ```
 
-| Step | Command | Changes the repo? | Stops for you when |
-|------|---------|-------------------|--------------------|
-| 0 Clone | `/dep-clone` | creates/switches the clone's branch `deps/wf-NNN` | clone failed, no main branch, or another workflow's unpublished changes are there |
-| 1 Snyk scan | `/dep-scan` | no | no Snyk CLI, or the login didn't complete |
-| 2 Inventory | `/dep-inventory` | no (build output only) | a discrepancy, a missing target version, or a red baseline |
-| 3 Impact + plan | `/dep-analyze` | no | **always**: approve the plan (asked only once `plan-check` says every module is decided) |
-| 4 Apply | `/dep-apply` | **yes**, on `deps/wf-NNN`, uncommitted | a step stays red after two fix attempts |
-| 5 Verify | `/dep-verify` | no (build output only) | **always**: review the results |
-| 6 Publish | `/dep-publish` | commits and pushes the branch | only runs when **you** start it |
-
 **At every stop**, the workflow's records are saved into this repository (`workflows.py save`, also `/dep-save`):
 committed, then pushed. Raw Snyk JSON and logs are left out, and the push is refused while the repository is public.
 
@@ -253,7 +243,7 @@ flowchart LR
 
 A monorepo is **one line, one clone, one branch, one PR**. It's supported when a root `pom.xml` lists the
 projects as `<module>`s (case A). Each step then covers every project. How to set it up:
-[README: Monorepos, step by step](../README.md#monorepos-one-git-repo-several-projects-step-by-step).
+[repos/README.md: Monorepos](../repos/README.md#monorepos-one-git-repo-several-projects).
 
 ```mermaid
 flowchart TB
@@ -282,14 +272,6 @@ flowchart TB
     f5 -->|"6 Publish"| pr[("ONE branch (deps/wf-NNN)<br/>ONE PR for the whole monorepo")]
 ```
 
-| Step | In a monorepo | Done by |
-|------|---------------|---------|
-| 1 Scan | Every `pom.xml`, one Snyk result each | `snyk-scan.sh` / `.ps1` (`--all-projects`, `--exclude` from `ignore-dirs.txt`) |
-| 2 Inventory | Every `pom.xml`, and every module's resolved tree | `maven-facts.sh` / `.ps1` → `script-helpers.py find-poms` |
-| 3 Impact + plan | The whole repo's code, config and tests | the procedure (`git grep`), `parse-snyk.py --into-plan` |
-| 5 Verify | One build of the whole reactor; test results from every module, `node_modules/` ignored | `verify-repo.sh` / `.ps1` → `script-helpers.py junit`; tested in both shells |
-| Smoke boot | Not for monorepos: it looks for the app's jar in the root `target/` only | leave out `smoke=true` |
-
 ---
 
 ## 7. `/dep-run` across chats: stops, replies, resume
@@ -297,7 +279,7 @@ flowchart TB
 A run is spread over several `/dep-run` calls: one per stop, ideally each in a fresh chat. It never relies on the
 chat. Every call finds the open run, reads `STATUS.md`, applies your reply and carries on from the first step that
 isn't done. Step by step for users:
-[README: What `/dep-run` does, step by step](../README.md#what-dep-run-does-step-by-step).
+[README: Run](../README.md#3-run-dep-run-repo).
 
 ```mermaid
 flowchart TB
@@ -325,10 +307,3 @@ flowchart TB
     classDef you fill:#fde2e1,stroke:#c0392b,color:#7b241c
     class s1,s2,s3,publish you
 ```
-
-| Call | It does | Ends at |
-|------|---------|---------|
-| `/dep-run inventory-service` (first) | New Workflow N; steps 0 → 3 | ⏸ plan ready (or an earlier block) |
-| `/dep-run inventory-service approve` | Resumes, ticks the plan; steps 4 → 5 | ⏸ verification done |
-| `/dep-run inventory-service approve fixes` (only if red) | Adds the fixes as plan steps; 4 → 5 again | ⏸ verification done |
-| `/dep-publish wf-NNN` (green) | Commit, push the branch, open the PR | PR opened · run finished |
