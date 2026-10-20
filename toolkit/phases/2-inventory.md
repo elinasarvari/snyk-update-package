@@ -15,7 +15,11 @@ version is set in the pom, and what else moves with it. Then take a **baseline**
 2. **Requested changes:** one row per in-scope change, with the Snyk issue ids/CVEs it fixes.
    Confirm each target **exists** on Maven Central
    (`https://repo1.maven.org/maven2/<group/as/path>/<artifact>/maven-metadata.xml`).
-   - No target given → look up the latest patch of the fixed line and mark it `proposed`.
+   - The target is **exactly Snyk's version** (`snyk/findings.md` §2 *Target*, or the override's version), never a
+     newer one you look up. Several Snyk versions for the same dependency → the highest of Snyk's.
+   - The lever is a parent/BOM: its target is the release that manages **exactly** Snyk's version (e.g. Snyk:
+     `spring-boot-starter-web` → 3.5.17 means `spring-boot-starter-parent` 3.5.17), not the newest release.
+   - No target from Snyk and none from the user → a blocker: ask, don't guess.
    - A target version that doesn't exist is a blocker.
 3. **Repos:** take them from the manifest (`repos.py list`). Snyk projects that aren't in the manifest go
    under Discrepancies, with the suggestion to `/dep-clone` them.

@@ -258,6 +258,35 @@ class NotTiedToOneLibrary(unittest.TestCase):
         self.assertIn("Nothing here is specific to one library", read("toolkit/WORKFLOW.md"))
 
 
+class TargetVersionsComeFromSnyk(unittest.TestCase):
+    """The plan moves to the version Snyk names, never to whatever is newest on Maven Central."""
+    INSTRUCTIONS = ("toolkit", ".github", ".claude")
+    LATEST = re.compile(r"\b(latest|newest)\b", re.I)
+    NOT_A_VERSION = re.compile(r"latest (main|base|records|origin)|fetched latest|from the latest", re.I)
+
+    def test_no_instruction_tells_the_assistant_to_pick_a_latest_version(self):
+        bad = []
+        for top in self.INSTRUCTIONS:
+            for base, dirs, files in os.walk(os.path.join(PROJECT, top)):
+                for name in files:
+                    if not name.endswith(".md"):
+                        continue
+                    rel = os.path.relpath(os.path.join(base, name), PROJECT)
+                    for n, line in enumerate(read(rel).splitlines(), 1):
+                        rest = self.NOT_A_VERSION.sub("", line)
+                        if self.LATEST.search(rest) and not re.search(r"\b(never|not|don't)\b", rest, re.I):
+                            bad.append("%s:%d: %s" % (rel, n, line.strip()))
+        self.assertEqual(bad, [], "versions come from Snyk, not 'latest'")
+
+    def test_the_rule_is_stated_where_versions_are_chosen(self):
+        self.assertIn("Target versions are Snyk's, exactly", read("toolkit/WORKFLOW.md"))
+        self.assertIn("exactly Snyk's version", read("toolkit/phases/2-inventory.md"))
+        self.assertIn("only at versions Snyk names or the user gives", read("toolkit/phases/3-analyze.md"))
+        self.assertIn("Versions not from Snyk", read("toolkit/templates/03-plan.md"))
+        self.assertIn("Snyk's version", read("toolkit/roles/dependency-analyst.md"))
+        self.assertIn("never a newer", read("toolkit/roles/upgrade-applier.md"))
+
+
 class RemediationAndScope(unittest.TestCase):
     """Nothing in scope is silently dropped: every path gets a fix or an explained out-of-scope entry."""
 

@@ -10,6 +10,14 @@ findings** (or a list the user gives): whatever Snyk reports, in any Maven or Gr
 Jackson etc. in these files are only **examples** of the patterns to look for (a platform parent/BOM, a coupled
 library), never a target to assume.
 
+**Target versions are Snyk's, exactly.** Every version the plan moves to is the one Snyk names: the upgrade path's
+version for the dependency to edit, Snyk's pin, or for an override the lowest *fixed in* version above the current
+one. When Snyk names several versions for the same dependency (one per issue or path), use the highest **of those**,
+so every issue is fixed. Never look up or choose the latest/newest release yourself. A version Snyk didn't name
+(a coupled library needs it, or Snyk has no fix for a path) is allowed only as the **lowest** version that works, with
+evidence, listed in the plan's *Versions not from Snyk* for the user to approve. No version from Snyk and none from
+the user means stop and ask.
+
 ```
 /dep-clone ─▶ /dep-scan ─▶ /dep-inventory ─▶ /dep-analyze ─▶ ⏸ approve ─▶ /dep-apply ─▶ /dep-verify ─▶ /dep-publish
  repos/    01-snyk-      02-inventory     03-impact       03-plan      04-apply-log   05-verification  06-publish

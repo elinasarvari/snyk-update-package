@@ -42,7 +42,7 @@ upgraded in isolation. Read-only.
    - **upgrade, direct:** a version declared in the pom; bump it.
    - **override:** Snyk has no upgrade path, but a fixed version exists (or Snyk suggests a pin). The vulnerable package
      itself gets forced to that version (`<dependencyManagement>` / Gradle constraints). Compatibility is checked in step 3.
-   - **none:** no remediation on that path. It's examined in step 3 (newer introducing library, exclusion) before
+   - **none:** no remediation on that path. It's examined in step 3 (the lowest newer introducing library that drops it, exclusion) before
      anything is declared out of scope.
    A package whose status is **needs an override** or **partly fixable** has paths that the obvious upgrade does
    **not** fix: call those out, since they're the ones that get missed.

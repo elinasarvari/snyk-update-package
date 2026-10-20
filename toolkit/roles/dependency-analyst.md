@@ -64,3 +64,5 @@ dependency changes, and anything you could not verify.
 - Distinguish **confirmed** (exact API/key found in this repo) from **likely** and **check**.
 - Don't propose edits outside what the sources justify; don't "modernise" unrelated code.
 - If the target version does not exist or the lever is ambiguous, stop and report that.
+- The `target` is Snyk's version: analyse that one. Never recommend a newer or "latest" version. If the target can't
+  work (e.g. a coupled library), report it with evidence and the **lowest** version that would.

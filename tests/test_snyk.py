@@ -173,6 +173,17 @@ class RemediationAndPaths(Sandbox):
         self.assertEqual(pkg["status"], "partly fixable")
         self.assertIn("no remediation path (Snyk: unresolved)", [p["remediation"] for p in pkg["paths"]])
 
+    def test_override_takes_the_lowest_fixed_version_above_yours_in_version_order(self):
+        # Text order would pick "1.10.0" (and "2.4.1" below); version order on your line picks 1.9.5 and 2.6.
+        lib = vuln("SNYK-LIB-1", "org.example:lib", "1.9.0", "high", [APP, "com.acme:x@1.0", "org.example:lib@1.9.0"],
+                   [], ["2.0", "1.10.0", "1.9.5"], upgradable=False)
+        old = vuln("SNYK-OLD-2", "org.example:old", "2.5", "high", [APP, "com.acme:y@1.0", "org.example:old@2.5"],
+                   [], ["3.0", "2.4.1", "2.6"], upgradable=False)
+        data, _ = self.parse(self.report([lib, old]))
+        fixes = {p["package"]: p["paths"][0]["remediation"] for p in data["packages"]}
+        self.assertIn("to 1.9.5 ", fixes["org.example:lib"])
+        self.assertIn("to 2.6 ", fixes["org.example:old"], "fixed versions below yours don't count")
+
     def test_long_path_lists_are_capped_in_markdown_but_complete_in_json(self):
         vulns = [self.snakeyaml(["com.acme:lib-%02d@1.0" % n]) for n in range(25)]
         data, md = self.parse(self.report(vulns))
@@ -204,6 +215,17 @@ class VulnerableModules(Sandbox):
         self.assertIn("| Fixed in | no fixed version |", md)
         self.assertEqual(md.count("| Plan step(s) | {{"), 3, "a decision table to fill in for every module")
         self.assertIn("| Fix chosen | {{no Snyk fix:", md, "no Snyk fix: left open")
+
+    def test_target_is_snyks_version_and_the_highest_of_snyks_when_it_names_several(self):
+        # Two issues in one package, Snyk names 2.9 and 2.10 for the same starter: 2.10 fixes both (version order).
+        a = vuln("SNYK-A-1", "org.example:core", "1.0", "high", [APP, "org.example:starter@2.0", "org.example:core@1.0"],
+                 [False, "org.example:starter@2.9"], ["1.1"])
+        b = vuln("SNYK-B-2", "org.example:core", "1.0", "high", [APP, "org.example:starter@2.0", "org.example:core@1.0"],
+                 [False, "org.example:starter@2.10"], ["1.2"])
+        report = self.write("in/r.json", json.dumps({"projectName": "com.example:app", "vulnerabilities": [a, b]}))
+        out = os.path.join(self.root, "modules.md")
+        self.script("parse-snyk.py", report, "--modules", out, check=True)
+        self.assertIn("| Target version | `org.example:starter` 2.10 _(Snyk's version, exactly)_ |", self.read(out))
 
 
 class ModulesIntoPlan(Sandbox):
@@ -285,7 +307,9 @@ class EfficientPlanning(Sandbox):
         self.assertIn("| Fix chosen | upgrade `org.example:intro` 1.0 -> 2.0 _(Snyk's fix for every path)_ |", plan)
         self.assertIn("| Verified by | Snyk re-scan shows SNYK-UP-1 gone · build and tests green |", plan)
         self.assertIn("| Fix chosen | {{no Snyk fix:", plan, "no fix: left for a decision")
-        self.assertIn("| Target version | {{at least the fixed-in version for your line: 1.1}} |", plan)
+        self.assertIn("| Target version | `org.example:intro` 2.0 _(Snyk's version, exactly)_ |", plan)
+        self.assertIn("| Target version | `org.example:pin` 3.1 _(Snyk's version, exactly)_ |", plan)
+        self.assertIn("| Target version | {{no Snyk version: the LOWEST version", plan, "no Snyk version: never guessed")
 
     def test_bulk_decisions_then_plan_check_proves_completeness(self):
         self.script("parse-snyk.py", os.path.join(self.root, "wf", "snyk", "*.json"), "--into-plan", self.plan, check=True)

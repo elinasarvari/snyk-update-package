@@ -339,7 +339,7 @@ Decision   in scope? · fix chosen · target version · plan step(s) · compatib
 | Look at | It's right when |
 |---------|-----------------|
 | **Fix chosen** | Follows the order: upgrade the library that brings it in → **override** the module to the fixed version → a newer introducing library or excluding the module → only then *out of scope* |
-| **Target version** | At or above the *Fixed in* version |
+| **Target version** | **Snyk's version, exactly**, pre-filled from the scan. Any other version must be listed under *Strategy* → *Versions not from Snyk*, with its reason |
 | **Plan step(s)** | Names the steps that cover **every** path listed. Cross-check with the plan's *Path coverage* table |
 | **Compatibility / risk** | Says what could break, with evidence from `03-impact.md`, not just "low risk" |
 | **In scope? = no** | Points to a row in *Out of scope* that says why and what happens next |
@@ -387,8 +387,9 @@ shown so you can follow along, or adjust decisions yourself.
 | `module-index.md` | **One line per module**: severity, status, Snyk's fix | The assistant, instead of every full entry |
 
 **2. A script puts the modules into the plan.** Every module from the scan lands in `03-plan.md` → *Vulnerable
-modules*, so none can be missed. Snyk's own answer is already filled in: **Fix chosen** (Snyk's fix for each path)
-and **Verified by** (the re-scan must show these issues gone).
+modules*, so none can be missed. Snyk's own answer is already filled in: **Fix chosen** (Snyk's fix for each path),
+**Target version** (Snyk's version, exactly: never the latest release) and **Verified by** (the re-scan must show
+these issues gone).
 
 ```bash
 python3 -I toolkit/scripts/parse-snyk.py "workflows/wf-001-<repo>/snyk/*.json" --into-plan workflows/wf-001-<repo>/03-plan.md   # macOS

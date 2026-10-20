@@ -25,8 +25,10 @@ Requires phase 2 ✅. Read-only. Writes `03-impact.md` and `03-plan.md`.
 ## Plan (`03-plan.md`)
 
 5. Copy `toolkit/templates/03-plan.md`. Plan from 03-impact **only**; do no new research.
-   - **Strategy:** one jump or stepping stones. For a medium/high-risk major jump, default to (a) the
-     latest minor of the current major, then (b) the target, each a separately green checkpoint. Explain the choice.
+   - **Strategy:** one jump or stepping stones, **only at versions Snyk names or the user gives** (e.g. Snyk's fix on
+     the current major, then the target), each a separately green checkpoint. Never add a "latest" version of your own.
+     Explain the choice. Any version not from Snyk goes in *Versions not from Snyk* with its reason
+     (`toolkit/WORKFLOW.md`, "Target versions are Snyk's, exactly").
    - **Order** the steps per repo so each compiles: pom/BOM bumps → coupled deps → renamed starters/artifacts
      → code package moves → config keys → test changes.
    - **Remediation order, for every in-scope package and each of its detailed paths** (`01-snyk-findings.md` §3):
@@ -34,14 +36,15 @@ Requires phase 2 ✅. Read-only. Writes `03-impact.md` and `03-plan.md`.
      2. no upgrade path but a fixed version exists → **override** the vulnerable package to it (`<dependencyManagement>`
         in Maven, `constraints` in Gradle), after checking the introducing library works with that version
         (its release notes, or that its tests still pass at verify);
-     3. no fixed version on that path → check whether a **newer version of the introducing library** drops or replaces
-        the package, or whether it can be **excluded** (`<exclusions>`) because nothing in the repo uses it
+     3. no fixed version on that path → check whether the **lowest newer version of the introducing library** that
+        drops or replaces the package exists (cite its release notes or pom), or whether it can be **excluded** (`<exclusions>`) because nothing in the repo uses it
         (`git grep` for its packages/classes);
      4. only when 1–3 are exhausted does the path go to **Out of scope**, saying what was tried.
    - **Vulnerable modules, itemized (do it by script, not by hand):**
      1. `python3 -I toolkit/scripts/parse-snyk.py "workflows/<id>/snyk/*.json" --into-plan workflows/<id>/03-plan.md`
-        puts every module into the plan: facts, issues, paths, and a Decision table where **Fix chosen** and
-        **Verified by** are already filled in from Snyk's data. A re-run keeps decisions you filled in.
+        puts every module into the plan: facts, issues, paths, and a Decision table where **Fix chosen**, **Target
+        version** (Snyk's version, exactly) and **Verified by** are already filled in from Snyk's data. Don't change a
+        pre-filled target. A re-run keeps decisions you filled in.
      2. Read `snyk/module-index.md` (one line per module), **not** the full entries. Open a module's full entry only
         if its status is `needs an override`, `partly fixable` or `no fix`, or its fix isn't what the plan does.
      3. Fill in the open fields **for groups of modules at once**:

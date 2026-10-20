@@ -145,7 +145,7 @@ sequenceDiagram
     A->>SA: dependency-analyst per (upgrade, repo)
     SA->>X: migration guides (once, then from the cache)
     SA-->>A: analysis files → 03-impact.md, plan steps
-    A->>P: --into-plan (every module, Snyk's fix pre-filled)
+    A->>P: --into-plan (every module, Snyk's fix and exact version pre-filled)
     A->>P: plan-decide (groups of modules, from module-index)
     A->>P: plan-check → "all N modules decided"
     A->>W: save (commit + push records)

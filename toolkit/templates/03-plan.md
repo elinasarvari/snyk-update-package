@@ -9,7 +9,10 @@
 
 ## Strategy
 
-{{One paragraph: single jump vs. stepping stones (e.g. 3.3 → 3.5 → 4.1), and why.}}
+{{One paragraph: single jump vs. stepping stones (only at versions Snyk names or the user gives), and why.}}
+
+**Versions not from Snyk:** {{none · or one row each: package, version, why (e.g. a coupled library needs it), evidence.
+Only the lowest version that works, and only with the user's approval}}
 
 ## Steps
 
@@ -53,7 +56,7 @@ Each step is small enough to build and test on its own. `/dep-apply` stops at th
 |---|---|
 | In scope? | {{yes / no: see Out of scope #n}} |
 | Fix chosen | {{upgrade `<dependency>` / override / newer introducing library / exclude / out of scope}} |
-| Target version | {{version the module ends up at}} |
+| Target version | {{Snyk's version, exactly (pre-filled by the script)}} |
 | Plan step(s) | {{Step n, …: every path is covered}} |
 | Compatibility / risk | {{what could break, with evidence from 03-impact.md}} |
 | Verified by | {{Snyk re-scan shows the issues gone · tests · smoke boot}} |

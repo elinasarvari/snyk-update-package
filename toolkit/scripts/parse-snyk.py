@@ -49,6 +49,23 @@ def split_coord(coord):
     return name, version
 
 
+def version_key(version):
+    """'1.10.0' > '1.9.5': compare numbers as numbers (text order gets this wrong). Qualifiers sort after numbers."""
+    parts = re.split(r"[.\-_+]", str(version or ""))
+    return [(0, int(x), "") if x.isdigit() else (1, 0, x.lower()) for x in parts]
+
+
+def fixed_for(fixed_in, current):
+    """Snyk's fixed-in version for the line you're on: the LOWEST fixed version above `current`
+    (never simply the newest). None when Snyk lists none above it."""
+    above = [f for f in fixed_in or [] if version_key(f) > version_key(current)]
+    return min(above, key=version_key) if above else None
+
+
+def highest(versions):
+    return max(versions, key=version_key) if versions else None
+
+
 def worse(a, b):
     return a if SEVERITY_ORDER.get(a, 0) >= SEVERITY_ORDER.get(b, 0) else b
 
@@ -119,12 +136,33 @@ def path_fix(vuln, path, pins, unresolved):
         return "upgrade", "upgrade `%s` %s -> %s" % (direct_name, direct_version, target)
     if pkg in pins:
         return "override", "override `%s` to %s (Snyk pin; no upgrade path)" % (pkg, pins[pkg])
-    if vuln.get("fixedIn"):
-        return "override", "override `%s` to %s (no upgrade path: dependencyManagement / constraints)" % (
-            pkg, sorted(vuln["fixedIn"])[0])
+    fixed = fixed_for(vuln.get("fixedIn"), vuln.get("version"))
+    if fixed:
+        return "override", "override `%s` to %s (no upgrade path: dependencyManagement / constraints)" % (pkg, fixed)
     if vuln.get("isPatchable"):
         return "patch", "Snyk patch only"
     return "none", "no remediation path" + (" (Snyk: unresolved)" if vuln.get("id") in unresolved else "")
+
+
+def snyk_edit(fix_type, remedy):
+    """-> [dependency to edit, Snyk's exact version] for an upgrade/override path, else None."""
+    if fix_type == "upgrade":
+        m = re.match(r"upgrade `([^`]+)` \S+ -> (\S+)", remedy)
+    elif fix_type == "override":
+        m = re.match(r"override `([^`]+)` to (\S+)", remedy)
+    else:
+        return None
+    return [m.group(1), m.group(2)] if m else None
+
+
+def snyk_targets(paths):
+    """{dependency to edit: Snyk's version}. When Snyk names several versions for the same dependency (one per
+    issue or path), the highest OF SNYK'S versions, so every issue is fixed - never a version Snyk didn't name."""
+    named = OrderedDict()
+    for entry in paths:
+        if entry.get("edit"):
+            named.setdefault(entry["edit"][0], []).append(entry["edit"][1])
+    return OrderedDict((dep, highest(vs)) for dep, vs in named.items())
 
 
 def collect(projects):
@@ -186,7 +224,8 @@ def collect(projects):
             add_unique(pkg["remediation"], remedy)
             add_unique(pkg["projects"], location)
             add_unique(pkg["fix_types"], fix_type)
-            entry = {"path": path[1:] or [pkg_name], "project": location, "fix": fix_type, "remediation": remedy}
+            entry = {"path": path[1:] or [pkg_name], "project": location, "fix": fix_type, "remediation": remedy,
+                     "edit": snyk_edit(fix_type, remedy)}
             if entry not in pkg["paths"]:
                 pkg["paths"].append(entry)
 
@@ -310,6 +349,13 @@ def to_modules(packages):
             out.append("| | _… %d more paths in snyk/findings.json_ | |" % (len(p["paths"]) - MAX_PATHS_SHOWN))
         fixes = sorted({e["remediation"] for e in p["paths"] if e["fix"] in ("upgrade", "override")})
         no_fix = any(e["fix"] in ("none", "patch") for e in p["paths"])
+        targets = "; ".join("`%s` %s" % (dep, v) for dep, v in snyk_targets(p["paths"]).items())
+        if targets and not no_fix:
+            target_row = targets + " _(Snyk's version, exactly)_"
+        elif targets:
+            target_row = targets + " _(Snyk's version)_ + {{for the path(s) Snyk can't fix: the LOWEST version that fixes it, with evidence}}"
+        else:
+            target_row = "{{no Snyk version: the LOWEST version of the introducing library that drops or fixes it, with evidence}}"
         if fixes and not no_fix:
             fix_chosen = "; ".join(fixes) + " _(Snyk's fix for every path)_"
         elif fixes:
@@ -319,7 +365,7 @@ def to_modules(packages):
         out += ["", "**Decision**", "", "| | |", "|---|---|",
                 "| In scope? | {{yes / no: see Out of scope #n}} |",
                 "| Fix chosen | %s |" % fix_chosen,
-                "| Target version | {{at least the fixed-in version for your line: %s}} |" % (", ".join(p["fixed_in"]) or "none known"),
+                "| Target version | %s |" % target_row,
                 "| Plan step(s) | {{Step n, …: every path above is covered}} |",
                 "| Compatibility / risk | {{what could break, with evidence from 03-impact.md}} |",
                 "| Verified by | Snyk re-scan shows %s gone · build and tests green |" % ", ".join(d["id"] for d in p["issue_details"]),
