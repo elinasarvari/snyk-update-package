@@ -29,6 +29,11 @@ identically and only differ in how they run processes. Python 3.9, stdlib only, 
                                                        -> set a Decision field for many modules at once. <which>:
                                                           numbers / ranges (1,3,5-9), all, or status:<status>
     script-helpers.py plan-check <plan>                -> list modules whose Decision still has {{gaps}}; exit 1 if any
+    script-helpers.py reuse <facts|baseline|analysis> <file> <repo-dir> [<current> <target>]
+                                                       -> is an earlier result still valid? It is when it was made
+                                                          at the repo's current commit (and, for an analysis report,
+                                                          for the same current -> target). Prints "reuse ..." and
+                                                          exits 0, or "redo: <why>" and exits 1
 """
 import glob
 import json
@@ -296,6 +301,48 @@ def plan_check(plan):
     print("all %d modules decided" % len(mods))
 
 
+def _commit_of(repo_dir):
+    code, out = run(["git", "-C", repo_dir, "rev-parse", "--short", "HEAD"])
+    return out.strip() if code == 0 else ""
+
+
+def reuse(kind, path, repo_dir, versions):
+    """Decide whether an earlier facts / baseline / analysis result can be used instead of redoing the work."""
+    def verdict(ok, why):
+        print(("reuse %s (%s)" if ok else "redo: %s - %s") % (path, why))
+        sys.exit(0 if ok else 1)
+    if kind not in ("facts", "baseline", "analysis"):
+        sys.exit("reuse: kind must be facts, baseline or analysis")
+    if not os.path.isfile(path) or os.path.getsize(path) == 0:
+        verdict(False, "not there yet")
+    now = _commit_of(repo_dir)
+    if not now:
+        verdict(False, "%s is not a git repo" % repo_dir)
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    if kind == "facts":
+        m = re.search(r"^GIT_COMMIT=(\S+)", text, re.M)
+        made_at = m.group(1) if m else ""
+    elif kind == "baseline":
+        try:
+            data = json.loads(text)
+        except ValueError:
+            verdict(False, "unreadable summary")
+        made_at = data.get("commit", "")
+        if data.get("status") in (None, "", "unsupported"):
+            verdict(False, "no build result in it")
+    else:
+        m = re.search(r"^BASED ON \| (\S+) \| (.+?) \u2192 (.+?)\s*$", text, re.M)
+        if not m:
+            verdict(False, "no 'BASED ON | <commit> | <current> \u2192 <target>' line")
+        made_at = m.group(1)
+        if len(versions) == 2 and (m.group(2).strip(), m.group(3).strip()) != (versions[0], versions[1]):
+            verdict(False, "made for %s \u2192 %s, now %s \u2192 %s" % (m.group(2), m.group(3), versions[0], versions[1]))
+    if not made_at or not (made_at.startswith(now) or now.startswith(made_at)):
+        verdict(False, "made at %s, the repo is now at %s" % (made_at or "an unknown commit", now))
+    verdict(True, "made at %s, still the repo's commit" % now)
+
+
 def main(argv):
     if not argv:
         sys.exit(__doc__)
@@ -308,6 +355,7 @@ def main(argv):
         "first-errors": lambda: first_errors(*args[:2]), "filter-tree": lambda: filter_tree(args[0], args[1], args[2:]),
         "ignore-dirs": lambda: ignore_dirs("--comma" in args), "find-poms": find_poms,
         "plan-decide": lambda: plan_decide(args[0], args[1], args[2:]), "plan-check": lambda: plan_check(args[0]),
+        "reuse": lambda: reuse(args[0], args[1], args[2], args[3:5]),
     }
     if cmd not in table:
         sys.exit("unknown helper %r\n%s" % (cmd, __doc__))

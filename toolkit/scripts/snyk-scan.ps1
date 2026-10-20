@@ -16,12 +16,13 @@
 # Never scans inside the folders in toolkit\ignore-dirs.txt (target\, node_modules\, ...): they are passed to
 # Snyk as --exclude=..., merged with any --exclude=... you give.
 #
-# Outputs in <out-dir>:  <repo-name>.json, <repo-name>.err, scan-index.tsv (repo, path, exit, meaning)
+# --reuse: keep a repo's earlier result instead of scanning again when it was made at the clone's current commit.
+# Outputs in <out-dir>:  <repo-name>.json, <repo-name>.err, scan-index.tsv (repo, path, exit, meaning, commit)
 # Then:  py -3 -I toolkit\scripts\parse-snyk.py <out-dir>\*.json --md findings.md --csv findings.csv
 . (Join-Path $PSScriptRoot 'common.ps1')
 . (Join-Path $PSScriptRoot 'snyk-common.ps1')
 
-if ($args.Count -lt 1) { Write-Err 'usage: snyk-scan.ps1 <out-dir> [--workflow <id> | --manifest <file>] [snyk args...]'; exit 64 }
+if ($args.Count -lt 1) { Write-Err 'usage: snyk-scan.ps1 <out-dir> [--workflow <id> | --manifest <file>] [--reuse] [snyk args...]'; exit 64 }
 $out = [string]$args[0]
 $rest = @()
 if ($args.Count -gt 1) { $rest = @($args[1..($args.Count - 1)] | ForEach-Object { [string]$_ }) }
@@ -45,15 +46,25 @@ if (-not (Test-SnykLogin)) {
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 $out = Get-FullPath $out
 $index = Join-Path $out 'scan-index.tsv'
-Write-Utf8File $index "repo`tpath`texit`tmeaning`n"
+# --reuse: an earlier clean result (exit 0/1) for the same repo at the same commit is kept instead of rescanning.
+$earlier = @{}
+if (Test-Path -LiteralPath $index) {
+    foreach ($line in [System.IO.File]::ReadAllLines($index)) {
+        $c = $line -split "`t"
+        if ($c.Count -ge 5 -and ($c[2] -eq '0' -or $c[2] -eq '1')) { $earlier[$c[0] + '@' + $c[4]] = @($c[2], ($c[3] -replace ' \(reused\)$', '')) }
+    }
+}
+Write-Utf8File $index "repo`tpath`texit`tmeaning`tcommit`n"
 
 $repos = @(Invoke-Python (@((Join-Path $PSScriptRoot 'repos.py')) + $listArgs + @('list')))
 if ($LASTEXITCODE -ne 0) { $repos | ForEach-Object { Write-Err $_ }; exit 2 }
 # Build output and dependency folders are never scanned: merge them into one --exclude=...
 $exclude = (Invoke-Helper @('ignore-dirs', '--comma')) -join ''
 $snykArgs = @()
+$reuse = $false
 foreach ($arg in $rest) {
-    if ($arg -like '--exclude=*') { $exclude = $arg.Substring(10) + ',' + $exclude } else { $snykArgs += $arg }
+    if ($arg -eq '--reuse') { $reuse = $true }
+    elseif ($arg -like '--exclude=*') { $exclude = $arg.Substring(10) + ',' + $exclude } else { $snykArgs += $arg }
 }
 $snykArgs += "--exclude=$exclude"
 $extra = ($snykArgs | ForEach-Object { Format-Arg $_ }) -join ' '
@@ -67,6 +78,16 @@ foreach ($row in $repos) {
         Write-Err "SKIP ${name}: $dir does not exist (not cloned yet?)"
         continue
     }
+    $commit = (& git -C $dir rev-parse --short HEAD 2>$null) -join ''
+    if (-not $commit) { $commit = '-' }
+    $jsonFile = Join-Path $out "$name.json"
+    $key = $name + '@' + $commit
+    if ($reuse -and $earlier.ContainsKey($key) -and (Test-Path -LiteralPath $jsonFile) -and (Get-Item -LiteralPath $jsonFile).Length -gt 0) {
+        $prev = $earlier[$key]
+        Add-Utf8Line $index "$name`t$dir`t$($prev[0])`t$($prev[1]) (reused)`t$commit"
+        Write-Err "REUSE ${name}: already scanned at $commit"
+        continue
+    }
     Write-Err "SCAN $name ($dir)"
     # --all-projects picks up every pom/gradle file under the path (multi-module included).
     $code = Invoke-ShellCommand -Cwd $dir -CommandLine ((Format-Arg $snyk) + " test --all-projects --json $extra").TrimEnd() `
@@ -75,7 +96,7 @@ foreach ($row in $repos) {
         0 { 'no vulnerabilities' } 1 { 'vulnerabilities found' } 2 { "scan failed - see $name.err" }
         3 { 'no supported project found' } default { 'unexpected exit' }
     }
-    Add-Utf8Line $index "$name`t$dir`t$code`t$meaning"
+    Add-Utf8Line $index "$name`t$dir`t$code`t$meaning`t$commit"
 }
 
 Get-Content -LiteralPath $index | ForEach-Object { Write-Err ($_ -replace "`t", '  ') }

@@ -291,6 +291,28 @@ class TargetVersionsComeFromSnyk(unittest.TestCase):
         self.assertIn("never a newer", read("toolkit/roles/upgrade-applier.md"))
 
 
+class NothingIsDoneTwice(unittest.TestCase):
+    """One scan per commit, and a re-plan reuses facts, baseline and analyst reports that are still valid."""
+
+    def test_scan_reuses_and_verify_rescans(self):
+        self.assertIn("--reuse", read("toolkit/phases/1-scan.md"))
+        self.assertIn("Scan each repo once per commit", read("toolkit/phases/1-scan.md"))
+        self.assertIn("**without\n   `--reuse`**", read("toolkit/phases/4-verify.md"), "the after-scan must see the changes")
+        for script in ("snyk-scan.sh", "snyk-scan.ps1"):
+            self.assertIn("--reuse", read("toolkit/scripts/" + script))
+
+    def test_plan_checks_before_redoing_facts_baseline_and_analysis(self):
+        plan = read("toolkit/phases/2-plan.md")
+        for kind in ("R facts ", "R baseline ", "R analysis "):
+            self.assertIn(kind, plan)
+        self.assertIn("BASED ON | <repo commit> | <current> → <target>", read("toolkit/roles/dependency-analyst.md"))
+
+    def test_no_fix_paths_are_checked_path_by_path_before_out_of_scope(self):
+        plan = read("toolkit/phases/2-plan.md")
+        self.assertIn("work through **each of its detailed paths**", plan)
+        self.assertIn("*Remediation tried* lists every\n         check", plan)
+
+
 class RemediationAndScope(unittest.TestCase):
     """Nothing in scope is silently dropped: every path gets a fix or an explained out-of-scope entry."""
 

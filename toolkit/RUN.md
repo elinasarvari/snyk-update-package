@@ -3,7 +3,9 @@
 Input: **one repo**, as its name in `repos/repos.txt`, its git URL, or a local checkout of it (only used to
 find the URL; the work always happens in the clone under `repos/`). Optionally also a
 workflow id to resume, and/or the user's reply to the last stop (e.g. "approve", "scope: high+",
-"proceed from 3.3.2").
+"proceed from 3.3.2", "fresh" to rescan and re-analyse instead of reusing earlier results).
+A resumed run never repeats a finished step, and a repeated step reuses what is still valid (scan per commit,
+facts, baseline, analyst reports: `phases/1-scan.md`, `phases/2-plan.md`).
 
 **`/dep-run status`** (or no argument): show where every workflow stands and stop. Run
 `python3 -I toolkit/scripts/workflows.py list` and `python3 -I toolkit/scripts/repos.py status`, then for each open run

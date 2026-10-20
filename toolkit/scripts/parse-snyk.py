@@ -162,7 +162,14 @@ def path_fix(vuln, path, pins, upgrades, unresolved):
         return "override", "override `%s` to %s (no upgrade path: dependencyManagement / constraints)" % (pkg, fixed), None
     if vuln.get("isPatchable"):
         return "patch", "Snyk patch only", None
-    return "none", "no remediation path" + (" (Snyk: unresolved)" if vuln.get("id") in unresolved else ""), None
+    # Nothing from Snyk on this path. Say what was checked and what the plan must check next, so it doesn't go
+    # straight to Out of scope.
+    if direct_name and direct_name != pkg:
+        nxt = "plan: the lowest newer `%s` that drops or fixes it, or exclude it if unused" % direct_name
+    else:
+        nxt = "plan: a newer `%s` that fixes it, or replace/remove it" % pkg
+    return "none", "no Snyk fix on this path%s (checked: upgrade path, remediation section, pin, fixed-in) - %s" % (
+        " (Snyk: unresolved)" if vuln.get("id") in unresolved else "", nxt), None
 
 
 def snyk_edit(fix_type, remedy):
@@ -315,13 +322,15 @@ def to_markdown(packages, changes, totals, projects):
     out += ["", "## 2. Changes to make", "",
             "`upgrade`: bump the direct dependency (or the parent/BOM that sets it). `override`: no upgrade path exists,",
             "so force the vulnerable package itself to its fixed version (Maven `<dependencyManagement>`, Gradle",
-            "constraints) - check compatibility. `none`: no remediation path; see the detailed paths.", "",
+            "constraints) - check compatibility. `none`: Snyk has no fix on that path (its upgrade path, remediation",
+            "section, pin and fixed-in were all checked). The plan then checks each of its detailed paths (section 3):",
+            "the lowest newer version of the library that brings it in, or excluding it, before anything is out of scope.", "",
             "| # | Fix | Edit | Current | Target | Max severity | Issues fixed | Fixes packages | Projects |",
             "|---|-----|------|---------|--------|--------------|--------------|----------------|----------|"]
     for i, c in enumerate(changes, 1):
         out.append("| %d | %s | `%s` | %s | %s | %s | %d | %s | %s |" % (
             i, c["fix"], c["direct_dependency"], c["current_version"],
-            c["target_version"] or "_no upgrade path_", c["max_severity"], c["issue_count"],
+            c["target_version"] or "_no Snyk fix: see its paths in section 3_", c["max_severity"], c["issue_count"],
             "<br>".join("`%s`" % p for p in c["fixes_packages"]), "<br>".join(c["projects"])))
 
     out += ["", "## 3. Detailed paths", "",

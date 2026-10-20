@@ -17,10 +17,11 @@ Scripts (run from the project root, Python with `python3 -I`):
 | Script | Purpose |
 |--------|---------|
 | `toolkit/scripts/repos.py add\|ensure\|clone\|list\|status\|release` | Manage target repos. `--workflow <id> clone` puts each clone on `deps/<id>`. `list` gives `name, build_dir, verify_args, url, base_branch, repo_dir` as TSV |
-| `toolkit/scripts/snyk-scan.sh <out> [--manifest f] [snyk args]` | `snyk test --all-projects --json` for every repo folder |
+| `toolkit/scripts/snyk-scan.sh <out> [--manifest f] [--reuse] [snyk args]` | `snyk test --all-projects --json` for every repo folder; `--reuse` keeps a result made at the same commit |
 | `toolkit/scripts/parse-snyk.py <json…> --md --csv --json` | Every flagged package + changes grouped by the dependency you edit |
 | `toolkit/scripts/maven-facts.sh <build_dir> <out> [filters]` | Parent, declared deps, version properties, resolved tree |
 | `toolkit/scripts/verify-repo.sh` / `.ps1` `<build_dir> <out> [--smoke] [--build-cmd]` | Build → JUnit counts → smoke boot → `summary.json` |
+| `toolkit/scripts/script-helpers.py reuse <facts\|baseline\|analysis> <file> <repo_dir> [<current> <target>]` | Is an earlier result still valid for the repo's commit (and version jump)? exit 0 reuse, 1 redo |
 
 The manifest for an upgrade is `workflows/<id>/repos.txt` if it exists, else `repos/repos.txt`. Pass it with
 `--manifest` to `repos.py` and `snyk-scan.sh`.

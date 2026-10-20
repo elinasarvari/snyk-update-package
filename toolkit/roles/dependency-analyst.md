@@ -47,10 +47,12 @@ the repository**. The only file you write is the report path you are given (in t
 
 ## Output
 
-Write `report` with a first line in this exact form, so the orchestrator can build the plan's Impact table:
+Write `report` with these two first lines, in this exact form. The first builds the plan's Impact table; the second
+lets a later re-plan reuse the report instead of analysing again (`git -C <repo> rev-parse --short HEAD`):
 
 ```
 SUMMARY | <package> | <current> → <target> | <patch|minor|major> | <low|medium|high> | <n code sites> | <n config keys> | <S|M|L effort>
+BASED ON | <repo commit> | <current> → <target>
 ```
 
 Then these sections:

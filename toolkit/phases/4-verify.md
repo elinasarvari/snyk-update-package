@@ -22,7 +22,8 @@ failure. Changes no source.
    - **environmental**: network, missing Docker/Redis, port in use, JDK mismatch;
    - **unknown**: no baseline and ambiguous. Don't guess.
    Write `<out_dir>/diagnosis.md` per red repo: symptom, cause, class, proposed fix.
-4. **Re-scan (if the Snyk CLI is available):** run phase 1 step 3 into `workflows/<id>/snyk-after/` and parse it.
+4. **Re-scan (if the Snyk CLI is available):** run phase 1 step 3 into `workflows/<id>/snyk-after/` **without
+   `--reuse`** (the changes aren't committed, so the commit hasn't moved; this scan must see them), and parse it.
    Add "Snyk findings before → after" to the report. **Every finding still open must be in `02-plan.md` → Out of
    scope.** Any other one (a path the plan meant to fix, or a new finding) is a regression: list it under Failures.
    Fill in the *Vulnerable modules: before → after* table, one row per module and issue from the plan.

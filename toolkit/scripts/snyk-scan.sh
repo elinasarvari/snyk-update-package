@@ -3,8 +3,11 @@
 # Read-only for the repos (Snyk resolves the Maven/Gradle tree; it does not edit files).
 #
 # Usage (from the project root):
-#   toolkit/scripts/snyk-scan.sh <out-dir> [--workflow <id> | --manifest <list-file>] [extra snyk args...]
-#   e.g. toolkit/scripts/snyk-scan.sh workflows/2026-10-15-x/snyk --org=my-org
+#   toolkit/scripts/snyk-scan.sh <out-dir> [--workflow <id> | --manifest <list-file>] [--reuse] [extra snyk args...]
+#   e.g. toolkit/scripts/snyk-scan.sh workflows/wf-002-orders/snyk --workflow 2 --reuse --org=my-org
+#
+#   --reuse   keep a repo's earlier result in <out-dir> instead of scanning it again, when that result was made at
+#             the clone's current commit (the commit is recorded in scan-index.tsv). Changed code is always rescanned.
 #
 # Needs the Snyk CLI, logged in. Which CLI is used, in this order:
 #   1. $SNYK_CLI                - e.g. the CLI your Snyk VS Code extension downloaded:
@@ -18,7 +21,7 @@
 #
 # Outputs in <out-dir>:
 #   <repo-name>.json   raw `snyk test --all-projects --json`
-#   scan-index.tsv     repo <TAB> path <TAB> exit-code <TAB> meaning
+#   scan-index.tsv     repo <TAB> path <TAB> exit-code <TAB> meaning <TAB> commit scanned
 # Then:  python3 -I toolkit/scripts/parse-snyk.py <out-dir>/*.json --md ... --csv ...
 set -uo pipefail
 
@@ -44,13 +47,17 @@ fi
 
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
-printf 'repo\tpath\texit\tmeaning\n' > "$out/scan-index.tsv"
+previous="$out/.scan-index.previous"
+if [[ -f "$out/scan-index.tsv" ]]; then cp "$out/scan-index.tsv" "$previous"; else : > "$previous"; fi
+printf 'repo\tpath\texit\tmeaning\tcommit\n' > "$out/scan-index.tsv"
 
 # Build output and dependency folders are never scanned: merge them into one --exclude=...
 exclude=$(python3 -I "$here/script-helpers.py" ignore-dirs --comma)
 snyk_args=()
+reuse=false
 for arg in "$@"; do
   case "$arg" in
+    --reuse) reuse=true ;;
     --exclude=*) exclude="${arg#--exclude=},$exclude" ;;
     *) snyk_args+=("$arg") ;;
   esac
@@ -66,6 +73,17 @@ while IFS=$'\t' read -r name dir _rest; do
     echo "SKIP $name: $dir does not exist (not cloned yet?)" >&2
     continue
   fi
+  commit=$(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo -)
+  if $reuse && [[ -s "$out/$name.json" ]]; then
+    # An earlier clean result (exit 0/1) for the same repo at the same commit is still valid.
+    earlier=$(awk -F'\t' -v n="$name" -v c="$commit" \
+      '$1==n && $5==c && ($3=="0" || $3=="1") { sub(/ \(reused\)$/, "", $4); print $3 "\t" $4; exit }' "$previous")
+    if [[ -n "$earlier" ]]; then
+      printf '%s\t%s\t%s (reused)\t%s\n' "$name" "$dir" "$earlier" "$commit" >> "$out/scan-index.tsv"
+      echo "REUSE $name: already scanned at $commit" >&2
+      continue
+    fi
+  fi
   echo "SCAN $name ($dir)" >&2
   # --all-projects picks up every pom/gradle file under the path (multi-module included).
   (cd "$dir" && "$snyk_bin" test --all-projects --json "${snyk_args[@]}") > "$out/$name.json" 2> "$out/$name.err"
@@ -77,7 +95,8 @@ while IFS=$'\t' read -r name dir _rest; do
     3) meaning="no supported project found" ;;
     *) meaning="unexpected exit" ;;
   esac
-  printf '%s\t%s\t%s\t%s\n' "$name" "$dir" "$code" "$meaning" >> "$out/scan-index.tsv"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$name" "$dir" "$code" "$meaning" "$commit" >> "$out/scan-index.tsv"
 done <<< "$repos"
 
+rm -f "$previous"
 column -t -s $'\t' "$out/scan-index.tsv" >&2

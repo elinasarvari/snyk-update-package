@@ -9,8 +9,21 @@ on the code (B), and the steps for the user to approve (C). Read-only: it never 
 - a manual list `group:artifact current->target, ...` → create the workflow folder as in phase 1 step 1. Then
   `python3 -I toolkit/scripts/workflows.py phase <id> 1 skipped --note "manual request"`.
 
-Start: copy `toolkit/templates/02-plan.md` → `workflows/<id>/02-plan.md`, then
-`python3 -I toolkit/scripts/workflows.py phase <id> 2 running`.
+Start: copy `toolkit/templates/02-plan.md` → `workflows/<id>/02-plan.md` (if it already exists, keep it and change only
+what's affected), then `python3 -I toolkit/scripts/workflows.py phase <id> 2 running`.
+
+**Don't redo work that is still valid.** Before steps 3, 7 and 10, ask the helper (`R` = `python3 -I
+toolkit/scripts/script-helpers.py reuse`); it says `reuse …` (exit 0) when the earlier result was made at the clone's
+current commit, and `redo: <why>` (exit 1) otherwise:
+
+| Before | Check | On `reuse` |
+|--------|-------|------------|
+| 3 facts | `R facts workflows/<id>/facts/<name>/facts.env <repo_dir>` | use the existing `facts/<name>/` |
+| 7 baseline | `R baseline workflows/<id>/verification/baseline/<name>/summary.json <repo_dir>` | use the existing baseline |
+| 10 each analyst | `R analysis workflows/<id>/analysis/<name>--<artifact>.md <repo_dir> <current> <target>` | don't start that analyst; use its report |
+
+So a re-plan (the user asked for changes, or "approve fixes" after a red verify) only analyses levers that are new or
+whose versions changed. The user can force everything again with `/dep-plan <id> fresh`.
 
 ## A. Versions (section "Versions")
 
@@ -70,10 +83,15 @@ Start: copy `toolkit/templates/02-plan.md` → `workflows/<id>/02-plan.md`, then
       2. no upgrade path but a fixed version exists → **override** the vulnerable package to it (`<dependencyManagement>`
          in Maven, `constraints` in Gradle), after checking the introducing library works with that version
          (its release notes, or that its tests still pass at verify);
-      3. no fixed version on that path → check whether the **lowest newer version of the introducing library** that
-         drops or replaces the package exists (cite its release notes or pom), or whether it can be **excluded**
-         (`<exclusions>`) because nothing in the repo uses it (`git grep` for its packages/classes);
-      4. only when 1–3 are exhausted does the path go to **Out of scope**, saying what was tried.
+      3. Snyk has no fix on that path (`none`: the script already checked its upgrade path, remediation section, pin and
+         fixed-in, and names the library that brings it in) → work through **each of its detailed paths**
+         (`snyk/findings.md` §3): check whether the **lowest newer version of that introducing library** drops or
+         replaces the package (its `maven-metadata.xml` for the versions, then that version's pom or release notes), or
+         whether the package can be **excluded** (`<exclusions>`) because nothing in the repo uses it (`git grep` for its
+         packages/classes). For a direct dependency, check a newer version of the package itself, or replacing it;
+      4. only when 1–3 are exhausted does the path go to **Out of scope**, and its *Remediation tried* lists every
+         check: Snyk's (upgrade path, remediation section, pin, fixed-in), the introducing-library versions looked at,
+         and the exclusion check (`git grep` result).
     - **Vulnerable modules, itemized (do it by script, not by hand):**
       1. `python3 -I toolkit/scripts/parse-snyk.py "workflows/<id>/snyk/*.json" --into-plan workflows/<id>/02-plan.md`
          puts every module into the plan: facts, issues, paths, and a Decision table where **Fix chosen**, **Target

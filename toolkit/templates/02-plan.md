@@ -125,7 +125,9 @@ the branch is left for inspection, never force-deleted by the tooling.
 
 Everything this plan deliberately does **not** fix, so nobody is surprised when it still shows up after the PR. Each
 row says what, why, and what happens next. Snyk findings land here only after the remediation order was exhausted
-(upgrade → override → newer introducing library / exclusion).
+(upgrade → override → newer introducing library / exclusion), checked path by path. *Remediation tried* lists each
+check: Snyk's (upgrade path, remediation section, pin, fixed-in), the introducing-library versions looked at, and
+the exclusion check.
 
 | # | What | Kind | Paths affected | Remediation tried | Why not now | Next step / owner |
 |---|------|------|----------------|-------------------|-------------|-------------------|

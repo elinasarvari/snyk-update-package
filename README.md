@@ -97,6 +97,18 @@ Give it the repo's name in `repos.txt`, its git URL, or a local checkout. It ope
 | 4 | Verify | Build, every module's tests, app start (`smoke=true`), Snyk re-scan; compared with the baseline, every failure diagnosed | ⏸ **always stops** |
 | 5 | Publish | Commit, push `deps/wf-NNN`, open the PR; the links go into `STATUS.md` | only by your own `/dep-publish wf-NNN` |
 
+**Snyk's suggested fixes** are read from the scan once, by script, and kept in the workflow folder:
+`snyk/findings.md` section 2 *Changes to make* (each edit, current → Snyk's target, what it fixes; per path: Snyk's
+upgrade path, its *remediation* section, its pin or the fixed-in version), section 3 (every dependency path with its
+fix), and `snyk/module-index.md` (one line per package). When Snyk has no fix for a path (`none`), the row says what
+was checked and names the library that brings it in, and the plan checks that library's newer versions and an
+exclusion, path by path, before anything is *Out of scope*.
+
+**Nothing is done twice.** Each repo is scanned once per commit (`snyk-scan --reuse`; changed code is rescanned), and a
+repeated plan reuses the facts, the baseline build and each analyst report while the repo's commit and the version jump
+are unchanged. Asking for a change in the plan only redoes what that change touches. Add `fresh` to force everything
+again (`/dep-scan <id> fresh`, `/dep-plan <id> fresh`). The only planned second scan is verify's, which must see the changes.
+
 **What the impact analysis (inside step 2) does.** Once the versions are verified, it lists the **levers**: the dependencies you actually
 edit, per repo. Many Snyk rows that one parent/BOM manages are a single lever. For each lever, a `dependency-analyst`
 helper runs, all in parallel, and:
@@ -146,7 +158,7 @@ Snyk's fix for each) and a **Decision**. The modules are generated from the scan
 | **Target version** | **Snyk's version, exactly** (pre-filled). Any other version is listed under *Strategy → Versions not from Snyk* with its reason |
 | **Plan step(s)** | Covers **every** path. A module is fixed only when every path is (see *Path coverage*) |
 | **Compatibility / risk** | Says what could break, with evidence from the plan's Impact section |
-| **In scope? = no** | Points to a row in *Out of scope* saying why and what happens next |
+| **In scope? = no** | Points to a row in *Out of scope* saying why and what happens next. For a finding Snyk can't fix (`none`), *Remediation tried* lists every check, path by path: Snyk's upgrade path, remediation section, pin and fixed-in, the newer versions of the library that brings it in, and whether it can be excluded |
 
 To change something, say so (*"module 3: override to 2.2"*), or edit the row yourself:
 `python3 -I toolkit/scripts/script-helpers.py plan-decide <plan> 7 "Target version=2.2"`, then `plan-check <plan>`.

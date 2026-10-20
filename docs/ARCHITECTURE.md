@@ -204,6 +204,7 @@ flowchart LR
 | Your own checkouts are never touched | `repos.py` only reads their URL; tested |
 | Build output and dependencies (`target/`, `node_modules/`, `.git/` …) are never searched, scanned or edited | `toolkit/ignore-dirs.txt` → Snyk `--exclude`, pom discovery, `.vscode/settings.json`, `.claude/settings.json` |
 | Workflow records go to **this** repo's GitHub, never raw Snyk JSON or logs; only while the repo is private | `workflows.py save` (commits only `workflows/`, refuses on a public repo); `.gitignore`; tested |
+| Nothing is scanned or analysed twice: one scan per repo commit; a re-plan reuses facts, baseline and analyst reports while the commit and version jump are unchanged | `snyk-scan --reuse` (commit recorded in `scan-index.tsv`), `script-helpers.py reuse` (`facts.env`, `summary.json`, the analyst's `BASED ON` line); tested |
 | Nothing is committed or pushed to a **target repo** except by `/dep-publish`, which you start | manual-only commands (Claude) and send-only-by-you handoffs (Copilot); tested |
 
 ---

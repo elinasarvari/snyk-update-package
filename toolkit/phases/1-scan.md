@@ -11,14 +11,20 @@ upgraded in isolation. Read-only.
 
 ## Steps
 
-1. **Workflow:** resolve the given id (`python3 -I toolkit/scripts/workflows.py resolve <ref>`), or start a new run with
+1. **Workflow:** resolve the given id (`python3 -I toolkit/scripts/workflows.py resolve <ref>`). No id: if
+   `python3 -I toolkit/scripts/workflows.py list` shows an open run for the same repos, offer to continue it (its scan is
+   reused) instead of starting another. Otherwise start a new run with
    `python3 -I toolkit/scripts/workflows.py new <slug> --title "<title>" --source "<Snyk report / manual>"`. The slug comes from the
    main package, or `snyk-sweep`. Tell the user the new id ("This is Workflow N: `wf-NNN`"). Then
    `python3 -I toolkit/scripts/workflows.py phase <id> 1 running`.
 2. **Repo folders:** if any repo in the list has no folder yet (URL not cloned, or wrong local path), run phase 0 first
    (`toolkit/phases/0-clone.md`).
 3. **Scan** (only when no report was supplied):
-   `bash toolkit/scripts/snyk-scan.sh workflows/<id>/snyk [--manifest workflows/<id>/repos.txt] [--org=<org>]`
+   `bash toolkit/scripts/snyk-scan.sh workflows/<id>/snyk [--manifest workflows/<id>/repos.txt] --reuse [--org=<org>]`
+   - **Scan each repo once per commit.** `--reuse` keeps a repo's earlier result in this folder when it was made at the
+     clone's current commit (`REUSE <repo>: already scanned at <commit>`); changed code is rescanned. Leave `--reuse` out
+     only when the user asks for a fresh scan (`/dep-scan <id> fresh`). If every repo was reused and
+     `01-snyk-findings.md` is already written, don't rewrite it: report the existing findings and go on.
    - The script prints `Using Snyk CLI: <path>`. It takes `$SNYK_CLI` (e.g. the CLI the Snyk VS Code extension
      downloaded), then `snyk` on PATH, then the extension's usual download folders.
    - Exit 127 = no CLI found (suggest `export SNYK_CLI=<path from the extension's settings>`, or installing it);

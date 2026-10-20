@@ -55,6 +55,7 @@ Every file you open and every line you print costs context. Keep it small:
 | the whole `dependency-tree.txt` | `filtered-tree.txt`, or `grep <artifact> dependency-tree.txt` |
 | reading files to find code | `git -C <repo> grep -n -l <pattern>` for the file list, then read only the lines around each hit |
 | re-researching a version jump | the research cache `workflows/_research/` (see `roles/dependency-analyst.md`) |
+| scanning or analysing again | `snyk-scan --reuse` (once per commit); `script-helpers.py reuse` (facts, baseline, analyses) |
 | all phase files up front | only the phase file you're running now |
 | re-typing generated tables into a document | link them, or let a script insert them (`parse-snyk.py --into-plan`) |
 | reading `snyk/findings.md` in full | section 2 ("changes to make") for planning; `grep` for a package |

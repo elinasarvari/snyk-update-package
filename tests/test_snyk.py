@@ -84,7 +84,9 @@ class ParseSnyk(Sandbox):
         self.assertEqual(lic["type"], "license")
         self.assertIn("`org.foo:gpl` (license)", md)
         nofix = next(p for p in data["packages"] if p["package"] == "org.foo:bar")
-        self.assertIn("no remediation path", nofix["remediation"])
+        text = " ".join(nofix["remediation"])
+        self.assertIn("no Snyk fix on this path (checked: upgrade path, remediation section, pin, fixed-in)", text)
+        self.assertIn("plan: a newer `org.foo:bar` that fixes it", text, "says what the plan checks next")
         self.assertEqual(nofix["status"], "no fix")
 
     def test_non_snyk_files_are_skipped_with_a_warning(self):
@@ -192,7 +194,11 @@ class RemediationAndPaths(Sandbox):
             remediation={"unresolved": [{"id": "SNYK-YAML-1"}]}))
         pkg = data["packages"][0]
         self.assertEqual(pkg["status"], "partly fixable")
-        self.assertIn("no remediation path (Snyk: unresolved)", [p["remediation"] for p in pkg["paths"]])
+        none = [p["remediation"] for p in pkg["paths"] if p["fix"] == "none"]
+        self.assertEqual(len(none), 1)
+        self.assertIn("no Snyk fix on this path (Snyk: unresolved)", none[0])
+        self.assertIn("the lowest newer `com.acme:old-thing` that drops or fixes it, or exclude it", none[0],
+                      "names the library that brings it in on that path")
 
     def test_override_takes_the_lowest_fixed_version_above_yours_in_version_order(self):
         # Text order would pick "1.10.0" (and "2.4.1" below); version order on your line picks 1.9.5 and 2.6.
@@ -357,6 +363,46 @@ class EfficientPlanning(Sandbox):
         self.assertNotEqual(self.helper("plan-decide", self.plan, "status:does not exist", "In scope?=yes").returncode, 0)
 
 
+class ReuseHelper(Sandbox):
+    """script-helpers.py reuse: facts, baseline and analyst reports are redone only when the repo's commit (or, for an
+    analysis, the version jump) changed - so re-planning doesn't re-analyse everything."""
+
+    def setUp(self):
+        super().setUp()
+        self.repo = os.path.join(self.tmp, "svc")
+        os.makedirs(self.repo)
+        self.git(self.repo, "init", "-q", "-b", "main")
+        self.git(self.repo, "commit", "-q", "--allow-empty", "-m", "one")
+        self.commit = self.git(self.repo, "rev-parse", "--short", "HEAD").strip()
+        self.helpers = os.path.join(self.root, "toolkit", "scripts", "script-helpers.py")
+
+    def reuse(self, *args):
+        return self.run_cmd([sys.executable, "-I", self.helpers, "reuse"] + list(args))
+
+    def test_results_made_at_the_current_commit_are_reused(self):
+        facts = self.write("facts.env", "BUILD_TOOL=maven\nGIT_COMMIT=%s\n" % self.commit)
+        base = self.write("summary.json", json.dumps({"commit": self.commit, "status": "green"}))
+        report = self.write("analysis.md", "SUMMARY | g:a | 1.0 → 2.0 | major | high | 3 | 1 | M\nBASED ON | %s | 1.0 → 2.0\n" % self.commit)
+        for args in (("facts", facts, self.repo), ("baseline", base, self.repo), ("analysis", report, self.repo, "1.0", "2.0")):
+            proc = self.reuse(*args)
+            self.assertEqual(proc.returncode, 0, proc.stdout)
+            self.assertIn("reuse ", proc.stdout)
+
+    def test_anything_else_is_redone_with_the_reason(self):
+        report = self.write("analysis.md", "SUMMARY | g:a | 1.0 → 2.0\nBASED ON | %s | 1.0 → 2.0\n" % self.commit)
+        other_jump = self.reuse("analysis", report, self.repo, "1.0", "3.0")
+        self.assertEqual(other_jump.returncode, 1)
+        self.assertIn("made for 1.0 → 2.0, now 1.0 → 3.0", other_jump.stdout)
+        self.assertIn("not there yet", self.reuse("facts", os.path.join(self.tmp, "nope.env"), self.repo).stdout)
+        old = self.write("no-based-on.md", "SUMMARY | g:a | 1.0 → 2.0\n")
+        self.assertIn("no 'BASED ON", self.reuse("analysis", old, self.repo, "1.0", "2.0").stdout)
+        facts = self.write("facts.env", "GIT_COMMIT=%s\n" % self.commit)
+        self.git(self.repo, "commit", "-q", "--allow-empty", "-m", "two")
+        moved = self.reuse("facts", facts, self.repo)
+        self.assertEqual(moved.returncode, 1)
+        self.assertIn("made at %s, the repo is now at" % self.commit, moved.stdout)
+
+
 class SnykScanTests:
     """snyk-scan.sh / snyk-scan.ps1 with a fake `snyk` CLI (a small Python program)."""
 
@@ -424,6 +470,31 @@ class SnykScanTests:
         self.assertIn("not cloned", index)
         self.assertIn("| %s test --all-projects --json --org=acme" % self.clone_dir("svc-a"), self.calls(),
                       "runs inside the clone and passes extra args through")
+
+    def test_reuse_scans_each_repo_once_per_commit(self):
+        self.manifest("svc-a  %s" % self.cloned_repo("svc-a"), "svc-b  %s" % self.cloned_repo("svc-b"))
+        env, _ = self.fake_snyk()
+        scans = lambda: self.calls().count("test --all-projects")
+        self.script("snyk-scan.sh", "out", "--reuse", env=env, check=True)          # nothing to reuse yet
+        self.assertEqual(scans(), 2)
+        index = self.read("out/scan-index.tsv")
+        commit_a = self.git(self.clone_dir("svc-a"), "rev-parse", "--short", "HEAD").strip()
+        self.assertIn("\t1\tvulnerabilities found\t%s" % commit_a, index, "the commit scanned is recorded")
+
+        proc = self.script("snyk-scan.sh", "out", "--reuse", env=env, check=True)   # same commits: no new scans
+        self.assertEqual(scans(), 2, proc.stdout)
+        self.assertIn("REUSE svc-a: already scanned at %s" % commit_a, proc.stdout)
+        self.assertIn("vulnerabilities found (reused)\t%s" % commit_a, self.read("out/scan-index.tsv"))
+
+        self.git(self.clone_dir("svc-a"), "commit", "-q", "--allow-empty", "-m", "new code")
+        proc = self.script("snyk-scan.sh", "out", "--reuse", env=env, check=True)   # svc-a changed: only it is rescanned
+        self.assertEqual(scans(), 3, proc.stdout)
+        self.assertIn("SCAN svc-a", proc.stdout)
+        self.assertIn("REUSE svc-b", proc.stdout)
+        self.assertNotIn("(reused) (reused)", self.read("out/scan-index.tsv"))
+
+        self.script("snyk-scan.sh", "out", env=env, check=True)                     # without --reuse: a fresh scan
+        self.assertEqual(scans(), 5)
 
     def test_workflow_option_scans_only_that_workflows_repos(self):
         self.manifest("svc-a  %s" % self.cloned_repo("svc-a"), "svc-b  %s" % self.cloned_repo("svc-b"))
